@@ -208,4 +208,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') closeProfile();
         });
+<<<<<<< HEAD
     }
+=======
+    }
+>>>>>>> origin/main

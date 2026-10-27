@@ -49,7 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $avatarPath = 'assets/uploads/avatars/' . $filename;
             }
 
+<<<<<<< HEAD
             $stmt = $pdo->prepare('UPDATE users SET full_name= ?, username = ?, avatar_path = ? WHERE user_id = ?');
+=======
+<<<<<<< HEAD
+            $stmt = $pdo->prepare('UPDATE users SET full_name= ?, username = ?, avatar_path = ? WHERE id = ?');
+=======
+            $stmt = $pdo->prepare('UPDATE users SET full_name= ?, username = ?, avatar_path = ? WHERE user_id = ?');
+>>>>>>> origin/main
+>>>>>>> origin/main
             $stmt->execute([$full_name, $username, $avatarPath !== '' ? $avatarPath : null, $user['id'] ?? 0]);
             $_SESSION['user']['full_name'] = $full_name;
             $_SESSION['user']['username'] = $username;
@@ -112,14 +120,33 @@ include __DIR__ . '/includes/header.php';
             <p class="eyebrow">QUICK ACTIONS</p>
             <h2>Account</h2>
             <div class="quick-links">
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+                <a href="account_settings.php" class="quick-link"><span>⚙</span><div><b>Account Settings</b><small>Change your password and preferences.</small></div>→</a>
+                <a href="help_center.php" class="quick-link"><span>?</span><div><b>Help Center</b><small>Find answers about the sales system.</small></div>→</a>
+=======
+>>>>>>> origin/main
                 <a href="account_settings.php" class="quick-link"><span>⚙</span>
                     <div><b>Account Settings</b><small>Change your password and preferences.</small></div>→
                 </a>
                 <a href="help_center.php" class="quick-link"><span>?</span>
                     <div><b>Help Center</b><small>Find answers about the sales system.</small></div>→
                 </a>
+<<<<<<< HEAD
+=======
+>>>>>>> origin/main
+>>>>>>> origin/main
             </div>
         </section>
     </div>
 </section>
+<<<<<<< HEAD
 <?php include __DIR__ . '/includes/footer.php'; ?>
+=======
+<<<<<<< HEAD
+<?php include __DIR__ . '/includes/footer.php'; ?>
+=======
+<?php include __DIR__ . '/includes/footer.php'; ?>
+>>>>>>> origin/main
+>>>>>>> origin/main

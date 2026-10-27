@@ -15,6 +15,19 @@ function niceDate(?string $date): string {
 }
 
 /**
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+ * Builds a document number like QT-2005, SO-1009, INV-3011 using the
+ * next auto_increment id of the table so numbers never collide.
+ */
+function nextDocNo(PDO $pdo, string $table, string $prefix, int $base = 0, int $pad = 0): string {
+    $stmt = $pdo->query("SELECT AUTO_INCREMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = " . $pdo->quote($table));
+    $next = (int) ($stmt->fetchColumn() ?: 1);
+    $number = $base + $next;
+    return $pad > 0 ? $prefix . str_pad((string) $number, $pad, '0', STR_PAD_LEFT) : $prefix . $number;
+=======
+>>>>>>> origin/main
  * Builds a document number like QT-2005, SO-1009, INV-3011.
  * Uses MAX(<primary key>)+1 (not information_schema, which can return a stale
  * AUTO_INCREMENT) and skips any number that already exists, so a duplicate
@@ -56,6 +69,7 @@ function nextDocNo(PDO $pdo, string $table, string $prefix, int $base = 0, int $
     } while ($taken);
 
     return $docNo;
+<<<<<<< HEAD
 }
 
 /**
@@ -109,6 +123,9 @@ function syncSalesOrderCompletion(PDO $pdo, int $orderId): void
               AND status <> 'Cancelled'
         ")->execute([$orderId]);
     }
+=======
+>>>>>>> origin/main
+>>>>>>> origin/main
 }
 
 function badgeClass(string $status): string {
@@ -123,12 +140,119 @@ function badgeClass(string $status): string {
 }
 
 /**
+<<<<<<< HEAD
  * Read one finished good directly from Inventory's finished_goods table.
  * Integration mapping: Sales product_code -> Inventory item_code.
  * Inventory stock comes from finished_goods.quantity.
  */
 function checkInventoryProduct(string $productCode): array
 {
+=======
+<<<<<<< HEAD
+ * Ask the Inventory team's API for product/stock data.
+ * Sales stores only the returned product_code/product_id as a soft reference.
+ */
+function checkInventoryProduct(string $productCode): array {
+    require_once __DIR__ . '/../config/inventory_api.php';
+
+    global $INVENTORY_API_BASE, $INVENTORY_API_TIMEOUT, $INVENTORY_API_MOCK_FALLBACK, $INVENTORY_USE_LOCAL_TABLE;
+
+    $productCode = trim($productCode);
+    if ($productCode === '') {
+        return ['ok' => false, 'error' => 'Product code is required.'];
+    }
+
+    // Standalone/demo mode: use the local inventory table in team_sales.
+    // This makes the Sales system functional on XAMPP even when the
+    // separate Inventory team's API is not running yet.
+    if ($INVENTORY_USE_LOCAL_TABLE) {
+        try {
+            require_once __DIR__ . '/../config/database.php';
+            $pdo = getDB();
+            $stmt = $pdo->prepare("SELECT product_id, product_code, product_name, quantity, unit_price, unit, status FROM inventory_products WHERE product_code = ? LIMIT 1");
+            $stmt->execute([$productCode]);
+            $product = $stmt->fetch();
+
+            if ($product) {
+                $qty = (int)$product['quantity'];
+                return [
+                    'ok' => true,
+                    'source' => 'local_inventory',
+                    'product_id' => (string)$product['product_id'],
+                    'product_code' => $product['product_code'],
+                    'product_name' => $product['product_name'],
+                    'available' => $product['status'] === 'Active' && $qty > 0,
+                    'quantity' => $qty,
+                    'unit_price' => (float)$product['unit_price'],
+                    'unit' => $product['unit'],
+                    'status' => $product['status']
+                ];
+            }
+
+            return ['ok' => false, 'error' => 'Product code not found in Inventory.', 'product_code' => $productCode];
+        } catch (Throwable $e) {
+            // If the local table has not been installed yet, continue to
+            // the external API path below instead of breaking the page.
+        }
+    }
+
+    $url = $INVENTORY_API_BASE . '?product_code=' . urlencode($productCode);
+    $ch = curl_init($url);
+    if ($ch === false) {
+        return ['ok' => false, 'error' => 'Could not initialize Inventory connection.'];
+    }
+
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => $INVENTORY_API_TIMEOUT,
+        CURLOPT_CONNECTTIMEOUT => $INVENTORY_API_TIMEOUT,
+        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($response !== false && $httpCode >= 200 && $httpCode < 300) {
+        $data = json_decode($response, true);
+        if (is_array($data)) {
+            return ['ok' => true, 'source' => 'inventory'] + $data;
+        }
+    }
+
+    if ($httpCode === 404) {
+        return [
+            'ok' => false,
+            'error' => 'Product not found in Inventory.',
+            'detail' => $curlError,
+            'http_code' => $httpCode,
+            'url' => $url
+        ];
+    }
+
+    if ($INVENTORY_API_MOCK_FALLBACK) {
+        $seed = crc32($productCode);
+        $qty = $seed % 25;
+        return [
+            'ok' => true,
+            'source' => 'mock',
+            'product_code' => $productCode,
+            'product_id' => 'MOCK-' . strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $productCode), 0, 18)),
+            'available' => $qty > 0,
+            'quantity' => $qty,
+            'unit_price' => 100 + ($seed % 900),
+            'note' => 'Inventory API not reachable; mock data is being used.'
+        ];
+    }
+
+    return ['ok' => false, 'error' => 'Could not reach Inventory service.', 'detail' => $curlError];
+=======
+ * Read one finished good directly from the Inventory database.
+ * The finished_goods row identifies the item through item_id; stock and
+ * price are read from the related items row when those columns exist.
+ */
+function checkInventoryProduct(string $productCode): array {
+>>>>>>> origin/main
     require_once __DIR__ . '/../config/inventory_db.php';
 
     $productCode = trim($productCode);
@@ -136,7 +260,11 @@ function checkInventoryProduct(string $productCode): array
     if ($productCode === '') {
         return [
             'ok' => false,
+<<<<<<< HEAD
             'error' => 'Product code is required.'
+=======
+            'error' => 'Finished good code is required.'
+>>>>>>> origin/main
         ];
     }
 
@@ -144,6 +272,7 @@ function checkInventoryProduct(string $productCode): array
         $inventoryDb = getInventoryDB();
 
         /*
+<<<<<<< HEAD
          * Inventory System is the master product source.
          * A valid Team Sales product must exist in BOTH:
          *   items.item_code
@@ -185,6 +314,41 @@ function checkInventoryProduct(string $productCode): array
                 i.status,
                 fg.fg_id,
                 fg.category_id,
+=======
+         * Team Inventory v1.39 structure:
+         * finished_goods -> item_id -> items
+         * inventory -> item_id + warehouse_id + quantity
+         *
+         * Stock is NOT stored in items. It is stored in inventory,
+         * so stock must be SUM(inventory.quantity).
+         */
+        $stmt = $inventoryDb->prepare("
+            SELECT
+                fg.fg_id AS id,
+                fg.item_id,
+                fg.finished_good_code,
+                fg.product_name,
+                fg.brand,
+                fg.size,
+                fg.unit,
+                fg.description,
+                fg.reorder_level,
+                fg.status,
+                fg.created_at,
+                COALESCE(SUM(inv.quantity), 0) AS quantity
+            FROM finished_goods fg
+            LEFT JOIN inventory inv
+                ON inv.item_id = fg.item_id
+            WHERE fg.finished_good_code = ?
+            GROUP BY
+                fg.fg_id,
+                fg.item_id,
+                fg.finished_good_code,
+                fg.product_name,
+                fg.brand,
+                fg.size,
+                fg.unit,
+>>>>>>> origin/main
                 fg.description,
                 fg.reorder_level,
                 fg.status,
@@ -198,6 +362,7 @@ function checkInventoryProduct(string $productCode): array
         if (!$product) {
             return [
                 'ok' => false,
+<<<<<<< HEAD
                 'error' => 'Product is not properly linked in the Inventory System. Check items and finished_goods for ' . $productCode . '.',
                 'item_code' => $productCode
             ];
@@ -222,6 +387,30 @@ function checkInventoryProduct(string $productCode): array
             'reorder_level' => (float)($product['reorder_level'] ?? 0),
             'status' => $status,
             'created_at' => $product['created_at'] ?? null,
+=======
+                'error' => 'Product not found in Inventory.',
+                'finished_good_code' => $productCode
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'id' => (int)$product['id'],
+            'item_id' => (int)$product['item_id'],
+            'finished_good_code' => $product['finished_good_code'],
+            'product_name' => $product['product_name'],
+            'brand' => $product['brand'] ?? '',
+            'size' => $product['size'] ?? '',
+            'unit' => $product['unit'] ?? 'pcs',
+            'description' => $product['description'] ?? '',
+            'reorder_level' => (float)($product['reorder_level'] ?? 0),
+            'status' => $product['status'] ?? 'Active',
+            'created_at' => $product['created_at'] ?? null,
+            'quantity' => (float)($product['quantity'] ?? 0),
+
+            // Sales staff enters the agreed unit price when creating a quotation.
+            'unit_price' => null,
+>>>>>>> origin/main
         ];
 
     } catch (Throwable $e) {
@@ -232,6 +421,7 @@ function checkInventoryProduct(string $productCode): array
     }
 }
 
+<<<<<<< HEAD
 function getInventoryStockRequest(string $requestNumber): ?array
 {
     $requestNumber = trim($requestNumber);
@@ -570,6 +760,23 @@ function createInventoryStockRequest(
         ];
     }
 }
+=======
+/**
+ * Decide a quotation's Inventory status from the inventory table.
+ * Returns ['ok'=>bool, 'error'=>?, 'status'=>'Approved'|'Rejected', 'stock'=>array]
+ */
+function evaluateQuotationStock(string $productCode, int $quantity): array {
+    $stock = checkInventoryProduct($productCode);
+    if (!$stock['ok']) {
+        return ['ok' => false, 'error' => $stock['error'] ?? 'Inventory check failed.'];
+    }
+    $available = (int) ($stock['quantity'] ?? 0);
+    $isActive  = !isset($stock['status']) || $stock['status'] === 'Active';
+    $status    = ($isActive && $available >= $quantity && $available > 0) ? 'Approved' : 'Rejected';
+    return ['ok' => true, 'status' => $status, 'stock' => $stock, 'available' => $available];
+}
+
+>>>>>>> origin/main
 /**
  * Customer-approved quotation -> Purchase Order.
  * Customer approval is the only approval required for a quotation.
@@ -592,7 +799,11 @@ function createPurchaseOrderFromQuotation(PDO $pdo, int $quotationId): ?string {
             (po_no, quotation_id, customer_id, product_code, inventory_product_id, quantity, total_amount, order_date, status)
             VALUES (?,?,?,?,?,?,?,CURDATE(),'Open')")
             ->execute([
+<<<<<<< HEAD
                 $poNo, $quotationId, $quotation['customer_id'], $quotation['product_code'],
+=======
+                $poNo, $quotationId, $quotation['customer_id'], $quotation['finished_good_code'],
+>>>>>>> origin/main
                 $quotation['fg_id'], $quotation['quantity'], $quotation['total_amount'],
             ]);
 
@@ -616,6 +827,7 @@ function createPurchaseOrderFromQuotation(PDO $pdo, int $quotationId): ?string {
  * stock is short, nothing is changed and an Exception is thrown.
  * Returns the new delivery number.
  */
+<<<<<<< HEAD
 
 /**
  * Create an exact stock-out request in the Inventory System.
@@ -1025,6 +1237,9 @@ function deductTeamSalesInventory(PDO $salesDb, string $productCode, float $quan
 
 function convertOrderToDelivery(PDO $pdo, int $orderId): string
 {
+=======
+function convertOrderToDelivery(PDO $pdo, int $orderId): string {
+>>>>>>> origin/main
     $pdo->beginTransaction();
 
     try {
@@ -1036,7 +1251,11 @@ function convertOrderToDelivery(PDO $pdo, int $orderId): string
             FOR UPDATE
         ");
         $st->execute([$orderId]);
+<<<<<<< HEAD
         $order = $st->fetch(PDO::FETCH_ASSOC);
+=======
+        $order = $st->fetch();
+>>>>>>> origin/main
 
         if (!$order) {
             throw new RuntimeException('Sales order is no longer awaiting approval.');
@@ -1049,17 +1268,26 @@ function convertOrderToDelivery(PDO $pdo, int $orderId): string
             LIMIT 1
         ");
         $dup->execute([$orderId]);
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
         if ($dup->fetchColumn()) {
             throw new RuntimeException('A delivery already exists for this order.');
         }
 
         $productCode = trim((string)($order['product_code'] ?? ''));
+<<<<<<< HEAD
         $quantity = (float)($order['quantity'] ?? 0);
+=======
+        $quantity = (int)($order['quantity'] ?? 0);
+>>>>>>> origin/main
 
         if ($productCode === '' || $quantity <= 0) {
             throw new RuntimeException('The Sales Order has no valid product code or quantity.');
         }
 
+<<<<<<< HEAD
         // Team Sales owns this stock. Inventory System is replenishment only.
         deductTeamSalesInventory($pdo, $productCode, $quantity);
 
@@ -1074,6 +1302,146 @@ function convertOrderToDelivery(PDO $pdo, int $orderId): string
         $pdo->prepare("
             UPDATE sales_orders
             SET admin_status = 'Approved',
+=======
+        /*
+         * Connect directly to Team Inventory.
+         * Stock lives in inventory.quantity, not items.quantity.
+         */
+        require_once __DIR__ . '/../config/inventory_db.php';
+        $inventoryDb = getInventoryDB();
+        $inventoryDb->beginTransaction();
+
+        try {
+            $fg = $inventoryDb->prepare("
+                SELECT
+                    fg.fg_id,
+                    fg.item_id,
+                    fg.finished_good_code,
+                    fg.status,
+                    COALESCE(SUM(inv.quantity), 0) AS available_quantity
+                FROM finished_goods fg
+                LEFT JOIN inventory inv
+                    ON inv.item_id = fg.item_id
+                WHERE fg.finished_good_code = ?
+                GROUP BY
+                    fg.fg_id,
+                    fg.item_id,
+                    fg.finished_good_code,
+                    fg.status
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $fg->execute([$productCode]);
+            $finishedGood = $fg->fetch(PDO::FETCH_ASSOC);
+
+            if (!$finishedGood || $finishedGood['status'] !== 'Active') {
+                throw new RuntimeException(
+                    'Finished good was not found or is inactive in Inventory.'
+                );
+            }
+
+            if ((float)$finishedGood['available_quantity'] < $quantity) {
+                throw new RuntimeException(
+                    'Not enough Inventory stock for ' . $productCode .
+                    '. Available: ' . $finishedGood['available_quantity'] .
+                    ', Required: ' . $quantity . '.'
+                );
+            }
+
+            /*
+             * Deduct from warehouse rows, starting with the first warehouse
+             * that has stock. This keeps the Inventory database as the source
+             * of truth for stock.
+             */
+            $stockRows = $inventoryDb->prepare("
+                SELECT id, quantity
+                FROM inventory
+                WHERE item_id = ?
+                  AND quantity > 0
+                ORDER BY warehouse_id ASC, id ASC
+                FOR UPDATE
+            ");
+            $stockRows->execute([(int)$finishedGood['item_id']]);
+            $stockRows = $stockRows->fetchAll(PDO::FETCH_ASSOC);
+
+            $remaining = $quantity;
+
+            foreach ($stockRows as $stockRow) {
+                if ($remaining <= 0) {
+                    break;
+                }
+
+                $take = min(
+                    $remaining,
+                    (float)$stockRow['quantity']
+                );
+
+                $deduct = $inventoryDb->prepare("
+                    UPDATE inventory
+                    SET quantity = quantity - ?
+                    WHERE id = ?
+                      AND quantity >= ?
+                ");
+
+                $deduct->execute([
+                    $take,
+                    (int)$stockRow['id'],
+                    $take
+                ]);
+
+                if ($deduct->rowCount() !== 1) {
+                    throw new RuntimeException(
+                        'Inventory changed while processing the delivery. Please try again.'
+                    );
+                }
+
+                $remaining -= $take;
+            }
+
+            if ($remaining > 0) {
+                throw new RuntimeException(
+                    'Inventory deduction could not be completed.'
+                );
+            }
+
+            $inventoryDb->commit();
+
+        } catch (Throwable $inventoryException) {
+            if ($inventoryDb->inTransaction()) {
+                $inventoryDb->rollBack();
+            }
+
+            throw $inventoryException;
+        }
+
+        $deliveryNo = nextDocNo(
+            $pdo,
+            'deliveries',
+            'DEL-',
+            700
+        );
+
+        $pdo->prepare("
+            INSERT INTO deliveries
+            (
+                delivery_no,
+                order_id,
+                delivery_date,
+                status,
+                inventory_deducted
+            )
+            VALUES
+            (?, ?, CURDATE(), 'Preparing', 1)
+        ")->execute([
+            $deliveryNo,
+            $orderId
+        ]);
+
+        $pdo->prepare("
+            UPDATE sales_orders
+            SET
+                admin_status = 'Approved',
+>>>>>>> origin/main
                 status = 'Processing'
             WHERE so_id = ?
         ")->execute([$orderId]);
@@ -1084,20 +1452,39 @@ function convertOrderToDelivery(PDO $pdo, int $orderId): string
             $pdo,
             'Approve',
             'Sales Order',
+<<<<<<< HEAD
             'Approved ' . ($order['order_no'] ?? 'Sales Order') .
             ' -> ' . $deliveryNo . ' (Team Sales Inventory deducted)',
+=======
+            'Approved ' . $order['order_no'] .
+            ' -> ' . $deliveryNo .
+            ' (Inventory deducted)',
+>>>>>>> origin/main
             $orderId
         );
 
         return $deliveryNo;
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
+<<<<<<< HEAD
         throw $e;
     }
 }
 
 
 
+=======
+
+        throw $e;
+    }
+>>>>>>> origin/main
+}
+
+>>>>>>> origin/main
 ?>

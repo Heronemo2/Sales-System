@@ -71,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'recor
                         WHERE inv_id = ?
                     ")->execute([$newPaid, $newStatus, $invoiceId]);
 
+<<<<<<< HEAD
                     // Sync Sales Order. Completed requires both Paid and Delivered.
                     $orderStmt = $pdo->prepare('SELECT order_id FROM sales_invoices WHERE inv_id = ?');
                     $orderStmt->execute([$invoiceId]);
@@ -79,6 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'recor
                         syncSalesOrderCompletion($pdo, $orderId);
                     }
 
+=======
+>>>>>>> origin/main
                     $pdo->commit();
 
                     header('Location: customer_account.php?section=billing&added=1');
@@ -95,7 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'recor
 }
 
 if (!empty($_GET['added'])) {
+<<<<<<< HEAD
     $notice = 'Collection recorded successfully. The Accounts Receivable and collection records were updated.';
+=======
+    $notice = 'Collection recorded successfully. The Accounts Receivable and Customer Balance on the receipt were updated.';
+>>>>>>> origin/main
 }
 
 /* =========================================================
@@ -121,6 +128,10 @@ if ($search !== '') {
    One receipt contains:
    - Accounts Receivable
    - Collection history / collection form
+<<<<<<< HEAD
+=======
+   - Customer Balance
+>>>>>>> origin/main
    ========================================================= */
 $sql = "
     SELECT
@@ -135,12 +146,36 @@ $sql = "
         c.customer_code,
         c.customer_name,
         c.payment_terms,
+<<<<<<< HEAD
         DATE_ADD(i.invoice_date, INTERVAL 30 DAY) AS due_date
     FROM sales_invoices i
     JOIN sales_orders o
         ON o.so_id = i.order_id
     JOIN customers c
         ON c.cus_id = o.customer_id
+=======
+        DATE_ADD(i.invoice_date, INTERVAL 30 DAY) AS due_date,
+
+        COALESCE(cb.total_billed, 0) AS customer_total_billed,
+        COALESCE(cb.total_paid, 0) AS customer_total_paid,
+        COALESCE(cb.outstanding, 0) AS customer_outstanding
+
+    FROM sales_invoices i
+    JOIN sales_orders o ON o.so_id = i.order_id
+    JOIN customers c ON c.cus_id = o.customer_id
+
+    LEFT JOIN (
+        SELECT
+            o2.customer_id,
+            SUM(i2.total_amount) AS total_billed,
+            SUM(i2.amount_paid) AS total_paid,
+            SUM(i2.total_amount - i2.amount_paid) AS outstanding
+        FROM sales_orders o2
+        JOIN sales_invoices i2 ON i2.order_id = o2.so_id
+        GROUP BY o2.customer_id
+    ) cb ON cb.customer_id = c.cus_id
+
+>>>>>>> origin/main
     $where
     ORDER BY i.invoice_date DESC, i.inv_id DESC
 ";
@@ -174,8 +209,13 @@ include __DIR__ . '/includes/header.php'; ?>
     <div class="billing-hero">
         <div>
             <p class="eyebrow light">BILLING / FINANCE</p>
+<<<<<<< HEAD
             <h2>Billing & Finance</h2>
             <p>Accounts Receivable and Collection are kept together on one billing receipt.</p>
+=======
+            <h2>Billing &amp; Finance</h2>
+            <p>Accounts Receivable, Collection, and Customer Balance are kept together on one billing receipt.</p>
+>>>>>>> origin/main
         </div>
         <a class="secondary-btn" href="invoices.php?section=billing">Open Sales Invoices</a>
     </div>
@@ -206,6 +246,7 @@ include __DIR__ . '/includes/header.php'; ?>
         </div>
     <?php endif; ?>
 
+<<<<<<< HEAD
     <div class="billing-list-panel panel">
         <div class="table-wrap">
             <table class="data-table filterable-table">
@@ -325,3 +366,155 @@ include __DIR__ . '/includes/header.php'; ?>
 </div>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
+=======
+    <div class="billing-receipt-list">
+        <?php foreach ($receipts as $receipt):
+            $invoiceId = (int)$receipt['invoice_id'];
+            $total = (float)$receipt['total_amount'];
+            $paid = (float)$receipt['amount_paid'];
+            $amountDue = max(0, $total - $paid);
+            $isPaid = $amountDue <= 0.00001;
+            $overdue = !$isPaid && strtotime($receipt['due_date']) < strtotime('today');
+            $receiptCollections = $collectionsByInvoice[$invoiceId] ?? [];
+        ?>
+            <article class="billing-receipt">
+                <div class="receipt-top">
+                    <div>
+                        <p class="eyebrow dark">BILLING &amp; FINANCE RECEIPT</p>
+                        <h2><?= htmlspecialchars($receipt['invoice_no']) ?></h2>
+                        <p class="muted">
+                            <?= htmlspecialchars($receipt['customer_name']) ?>
+                            · <?= htmlspecialchars($receipt['customer_code']) ?>
+                            · Order <?= htmlspecialchars($receipt['order_no']) ?>
+                        </p>
+                    </div>
+                    <div class="receipt-status">
+                        <span class="badge <?= $isPaid ? 'success' : ($overdue ? 'danger' : 'warning') ?>">
+                            <?= $isPaid ? 'Paid' : ($overdue ? 'Overdue' : 'Outstanding') ?>
+                        </span>
+                        <small><?= niceDate($receipt['invoice_date']) ?></small>
+                    </div>
+                </div>
+
+                <div class="receipt-divider"></div>
+
+                <div class="receipt-sections">
+                    <!-- ACCOUNTS RECEIVABLE -->
+                    <section class="receipt-section">
+                        <div class="receipt-section-title">01 · ACCOUNTS RECEIVABLE</div>
+                        <div class="receipt-detail-grid">
+                            <div><span>Invoice</span><strong><?= htmlspecialchars($receipt['invoice_no']) ?></strong></div>
+                            <div><span>Invoice Date</span><strong><?= niceDate($receipt['invoice_date']) ?></strong></div>
+                            <div><span>Due Date</span><strong><?= niceDate($receipt['due_date']) ?></strong></div>
+                            <div><span>Invoice Total</span><strong><?= peso($total) ?></strong></div>
+                        </div>
+                        <div class="receipt-amount-row">
+                            <span>Amount Paid</span>
+                            <strong><?= peso($paid) ?></strong>
+                        </div>
+                        <div class="receipt-amount-row outstanding">
+                            <span>Accounts Receivable / Amount Due</span>
+                            <strong><?= peso($amountDue) ?></strong>
+                        </div>
+                    </section>
+
+                    <!-- COLLECTION -->
+                    <section class="receipt-section">
+                        <div class="receipt-section-title">02 · COLLECTION</div>
+
+                        <?php if ($receiptCollections): ?>
+                            <div class="receipt-collection-list">
+                                <?php foreach ($receiptCollections as $collection): ?>
+                                    <div class="receipt-collection-row">
+                                        <div>
+                                            <span>Collection No.</span>
+                                            <strong><?= htmlspecialchars($collection['collection_no']) ?></strong>
+                                        </div>
+                                        <div>
+                                            <span>Date</span>
+                                            <strong><?= niceDate($collection['collection_date']) ?></strong>
+                                        </div>
+                                        <div>
+                                            <span>Method</span>
+                                            <strong><?= htmlspecialchars($collection['method']) ?></strong>
+                                        </div>
+                                        <div>
+                                            <span>Amount</span>
+                                            <strong><?= peso((float)$collection['amount']) ?></strong>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <p class="empty-text">No collection has been recorded for this invoice.</p>
+                        <?php endif; ?>
+
+                        <?php if (!$isPaid): ?>
+                            <form method="POST" class="receipt-payment-form">
+                                <input type="hidden" name="action" value="record_collection">
+                                <input type="hidden" name="invoice_id" value="<?= $invoiceId ?>">
+
+                                <div class="receipt-form-title">Record Collection</div>
+
+                                <div class="receipt-form-grid">
+                                    <label>Amount (₱)
+                                        <input type="number" name="amount" step="0.01" min="0.01" max="<?= htmlspecialchars(number_format($amountDue, 2, '.', '')) ?>" required>
+                                    </label>
+
+                                    <label>Collection Date
+                                        <input type="date" name="collection_date" value="<?= date('Y-m-d') ?>" required>
+                                    </label>
+
+                                    <label>Due Date
+                                        <input type="date" name="due_date" value="<?= htmlspecialchars($receipt['due_date']) ?>" required>
+                                    </label>
+
+                                    <label>Method
+                                        <select name="method">
+                                            <option value="Cash">Cash</option>
+                                            <option value="GCash">GCash</option>
+                                            <option value="Bank Transfer">Bank Transfer</option>
+                                        </select>
+                                    </label>
+                                </div>
+
+                                <button type="submit" class="primary-btn">Save Collection</button>
+                            </form>
+                        <?php endif; ?>
+                    </section>
+
+                    <!-- CUSTOMER BALANCE -->
+                    <section class="receipt-section">
+                        <div class="receipt-section-title">03 · CUSTOMER BALANCE</div>
+                        <div class="customer-balance-box">
+                            <div>
+                                <span>Customer</span>
+                                <strong><?= htmlspecialchars($receipt['customer_name']) ?></strong>
+                            </div>
+                            <div>
+                                <span>Total Billed</span>
+                                <strong><?= peso((float)$receipt['customer_total_billed']) ?></strong>
+                            </div>
+                            <div>
+                                <span>Total Paid</span>
+                                <strong><?= peso((float)$receipt['customer_total_paid']) ?></strong>
+                            </div>
+                            <div class="balance-highlight">
+                                <span>Outstanding Balance</span>
+                                <strong><?= peso((float)$receipt['customer_outstanding']) ?></strong>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="receipt-footer">
+                    <span>Payment Terms: <?= htmlspecialchars($receipt['payment_terms'] ?: '30 Days') ?></span>
+                    <span>Receipt status is computed from the invoice and collection records.</span>
+                </div>
+            </article>
+        <?php endforeach; ?>
+    </div>
+</div>
+
+<?php include __DIR__ . '/includes/footer.php'; ?>
+>>>>>>> origin/main

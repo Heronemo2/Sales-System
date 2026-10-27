@@ -4,6 +4,7 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
 requireSalesWorkspace();
 $pdo = getDB();
+<<<<<<< HEAD
 $error = '';
 $notice = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
@@ -22,6 +23,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     syncSalesOrderCompletion($pdo, $orderId);
     $notice = 'Sales Invoice ' . $no . ' created.';
   }
+=======
+<<<<<<< HEAD
+
+$error = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $orderId = (int) ($_POST['order_id'] ?? 0);
+    $date = $_POST['invoice_date'] ?? '';
+    $total = (float) ($_POST['total_amount'] ?? 0);
+
+    if (!$orderId || !$date || $total <= 0) {
+        $error = 'Order, date, and a total amount greater than 0 are required.';
+    } else {
+        $invoiceNo = nextDocNo($pdo, 'sales_invoices', 'INV-', 3000);
+        $stmt = $pdo->prepare("INSERT INTO sales_invoices (invoice_no, order_id, invoice_date, total_amount, amount_paid, status) VALUES (?,?,?,?,0,'Unpaid')");
+        $stmt->execute([$invoiceNo, $orderId, $date, $total]);
+        logActivity($pdo, 'Create', 'Sales Invoice', 'Created ' . $invoiceNo, (int)$pdo->lastInsertId());
+        $pdo->prepare("UPDATE sales_orders SET status = 'Invoiced' WHERE id = ?")->execute([$orderId]);
+        header('Location: invoices.php?section=billing&added=1');
+        exit;
+    }
+}
+
+$pageTitle = 'Sales Invoices';
+include __DIR__ . '/includes/header.php';
+
+$search=trim($_GET['search']??''); $sql='SELECT i.*, o.order_no, c.customer_name AS customer_name FROM sales_invoices i JOIN sales_orders o ON o.id=i.order_id JOIN customers c ON c.id=o.customer_id'; $params=[]; if($search!==''){ $sql.=' WHERE i.invoice_no LIKE ? OR o.order_no LIKE ? OR c.customer_name LIKE ? OR i.status LIKE ?'; $like='%'.$search.'%'; $params=[$like,$like,$like,$like]; } $sql.=' ORDER BY i.id DESC'; $st=$pdo->prepare($sql); $st->execute($params); $rows=$st->fetchAll();
+$orders = $pdo->query('SELECT o.id, o.order_no, o.total_amount, c.customer_name AS customer_name FROM sales_orders o JOIN customers c ON c.id = o.customer_id ORDER BY o.id DESC')->fetchAll();
+?>
+<div class="page-toolbar"><p class="muted" style="color: white;">Billing records and payment status.</p><button class="primary-btn" data-open-modal="addInvoiceModal">+ Create Invoice</button></div>
+<div class="module-search"><form method="GET"><input type="hidden" name="section" value="billing"><input type="search" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search invoices, orders, customers, or status..."><button class="secondary-btn" type="submit">Search</button><?php if($search!==''): ?><a class="text-link" href="invoices.php?section=billing">Clear</a><?php endif; ?></form></div>
+
+<?php if (!empty($_GET['added'])): ?><div class="alert success">Invoice created successfully.</div><?php endif; ?>
+<?php if ($error): ?><div class="alert error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+
+<div class="panel"><div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Order</th><th>Customer Name</th><th>Amount</th><th>Payment Status</th></tr></thead><tbody>
+<?php if (!$rows): ?><tr class="empty-row"><td colspan="5">No invoices yet. Create the first one above.</td></tr><?php endif; ?>
+<?php foreach ($rows as $r): ?>
+    <tr>
+        <td><b><?= htmlspecialchars($r['invoice_no']) ?></b></td>
+        <td><?= htmlspecialchars($r['order_no']) ?></td>
+        <td><?= htmlspecialchars($r['customer_name']) ?></td>
+        <td><?= peso((float) $r['total_amount']) ?></td>
+        <td><span class="badge <?= badgeClass($r['status']) ?>"><?= htmlspecialchars($r['status']) ?></span></td>
+    </tr>
+<?php endforeach; ?>
+</tbody></table></div></div>
+
+<div class="modal-backdrop" id="addInvoiceModal" aria-hidden="true">
+    <div class="profile-modal entry-modal" role="dialog" aria-modal="true" aria-labelledby="addInvoiceTitle">
+        <button class="modal-close" type="button" aria-label="Close" data-close-modal>×</button>
+        <p class="eyebrow">BILLING</p>
+        <h2 id="addInvoiceTitle">Create Invoice</h2>
+        <form method="POST" class="entry-form">
+            <label>Sales Order
+                <select name="order_id" id="invoiceOrderSelect" required>
+                    <option value="">Select order</option>
+                    <?php foreach ($orders as $o): ?><option value="<?= $o['id'] ?>" data-total="<?= $o['total_amount'] ?>"><?= htmlspecialchars($o['order_no']) ?> — <?= htmlspecialchars($o['customer_name']) ?></option><?php endforeach; ?>
+                </select>
+            </label>
+            <label>Invoice Date
+                <input type="date" name="invoice_date" value="<?= date('Y-m-d') ?>" required>
+            </label>
+            <label>Total Amount (₱)
+                <input type="number" step="0.01" min="0.01" name="total_amount" id="invoiceTotalInput" required>
+            </label>
+            <div class="modal-actions">
+                <button type="button" class="secondary-btn" data-close-modal>Cancel</button>
+                <button type="submit" class="primary-btn">Save Invoice</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+document.getElementById('invoiceOrderSelect')?.addEventListener('change', function () {
+    const opt = this.options[this.selectedIndex];
+    const total = opt?.dataset.total;
+    if (total) document.getElementById('invoiceTotalInput').value = total;
+});
+</script>
+
+<?php include __DIR__ . '/includes/footer.php'; ?>
+=======
+$error = '';
+$notice = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
+    $orderId = (int)($_POST['order_id'] ?? 0);
+    $date = $_POST['invoice_date'] ?? date('Y-m-d');
+    $st = $pdo->prepare("SELECT o.* FROM sales_orders o WHERE o.so_id=? AND o.admin_status='Approved' AND NOT EXISTS(SELECT 1 FROM sales_invoices i WHERE i.order_id=o.so_id)");
+    $st->execute([$orderId]);
+    $o = $st->fetch();
+    if (!$o) $error = 'Only approved sales orders without an invoice can be invoiced.';
+    else {
+        $no = nextDocNo($pdo, 'sales_invoices', 'INV-', 3000);
+        $paid = ($o['payment_status'] ?? 'Pending') === 'Paid' ? (float)$o['total_amount'] : 0.0;
+        $invStatus = $paid > 0 ? 'Paid' : 'Unpaid';
+        $pdo->prepare("INSERT INTO sales_invoices(invoice_no,order_id,invoice_date,total_amount,amount_paid,status) VALUES(?,?,?,?,?,?)")->execute([$no, $orderId, $date, $o['total_amount'], $paid, $invStatus]);
+        $pdo->prepare("UPDATE sales_orders SET status='Invoiced' WHERE so_id=?")->execute([$orderId]);
+        $notice = 'Sales Invoice ' . $no . ' created.';
+    }
+>>>>>>> origin/main
 }
 $orders = $pdo->query("SELECT o.so_id,o.order_no,o.total_amount,c.customer_name FROM sales_orders o JOIN customers c ON c.cus_id=o.customer_id WHERE o.admin_status='Approved' AND NOT EXISTS(SELECT 1 FROM sales_invoices i WHERE i.order_id=o.so_id) ORDER BY o.so_id DESC")->fetchAll();
 $st = $pdo->query("SELECT i.*,o.order_no,o.product_code,o.quantity,c.customer_name,c.email,c.address FROM sales_invoices i JOIN sales_orders o ON o.so_id=i.order_id JOIN customers c ON c.cus_id=o.customer_id ORDER BY i.inv_id DESC");
@@ -29,6 +130,7 @@ $rows = $st->fetchAll();
 $pageTitle = 'Sales Invoice';
 include __DIR__ . '/includes/header.php';
 ?>
+<<<<<<< HEAD
 
 <div class="page-toolbar">
   <p class="muted" style="color:white;">Invoice list — open <b>View Invoice</b> to see the complete invoice.</p>
@@ -130,3 +232,49 @@ include __DIR__ . '/includes/header.php';
   }));
 </script>
 <?php include __DIR__ . '/includes/footer.php'; ?>
+=======
+<div class="page-toolbar">
+    <p class="muted" style="color:white;">Sales Invoices are displayed as formal invoice forms instead of a table.</p><button class="primary-btn" data-open-modal="invoiceModal">+ Create Sales Invoice</button>
+</div>
+<?php if ($notice): ?><div class="alert success"><?= htmlspecialchars($notice) ?></div><?php endif; ?><?php if ($error): ?><div class="alert error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+<div class="invoice-form-list">
+    <?php foreach ($rows as $r): ?>
+        <div class="invoice-paper">
+            <div class="invoice-top">
+                <div>
+                    <p class="eyebrow dark">TEAM SALES</p>
+                    <h2>SALES INVOICE</h2>
+                </div>
+                <div class="invoice-number"><span>Invoice No.</span><b><?= htmlspecialchars($r['invoice_no']) ?></b><small><?= niceDate($r['invoice_date']) ?></small></div>
+            </div>
+            <div class="invoice-customer">
+                <div><span>Bill To</span><b><?= htmlspecialchars($r['customer_name']) ?></b><small><?= htmlspecialchars($r['address'] ?? '') ?></small><small><?= htmlspecialchars($r['email'] ?? '') ?></small></div>
+                <div><span>Sales Order</span><b><?= htmlspecialchars($r['order_no']) ?></b></div>
+            </div>
+            <div class="invoice-line">
+                <div><span>Product</span><b><?= htmlspecialchars($r['product_code']) ?></b></div>
+                <div><span>Quantity</span><b><?= (int)$r['quantity'] ?></b></div>
+                <div><span>Amount</span><b><?= peso((float)$r['total_amount']) ?></b></div>
+            </div>
+            <div class="invoice-total"><span>Total Amount</span><strong><?= peso((float)$r['total_amount']) ?></strong></div>
+            <div class="invoice-status"><span class="badge <?= badgeClass($r['status']) ?>"><?= htmlspecialchars($r['status']) ?></span><a class="table-action" href="billing.php?section=billing">Open AR / Collection</a></div>
+        </div>
+    <?php endforeach; ?>
+    <?php if (!$rows): ?><div class="panel">
+            <div class="note-card"><b>No Sales Invoices yet.</b><span>Create an invoice after a Sales Order is approved.</span></div>
+        </div><?php endif; ?>
+</div>
+<div class="modal-backdrop" id="invoiceModal" aria-hidden="true">
+    <div class="profile-modal entry-modal"><button class="modal-close" type="button" data-close-modal>×</button>
+        <p class="eyebrow">BILLING</p>
+        <h2>Create Sales Invoice</h2>
+        <form method="POST" class="entry-form"><input type="hidden" name="action" value="create"><label>Sales Order<select name="order_id" required>
+                    <option value="">Select approved order</option><?php foreach ($orders as $o): ?><option value="<?= $o['id'] ?>"><?= htmlspecialchars($o['order_no']) ?> — <?= htmlspecialchars($o['customer_name']) ?> · <?= peso((float)$o['total_amount']) ?></option><?php endforeach; ?>
+                </select></label><label>Invoice Date<input type="date" name="invoice_date" value="<?= date('Y-m-d') ?>" required></label>
+            <div class="modal-actions"><button type="button" class="secondary-btn" data-close-modal>Cancel</button><button class="primary-btn">Create Invoice</button></div>
+        </form>
+    </div>
+</div>
+<?php include __DIR__ . '/includes/footer.php'; ?>
+>>>>>>> origin/main
+>>>>>>> origin/main

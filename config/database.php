@@ -3,7 +3,11 @@
 // Change these values when you connect the project to XAMPP/MySQL.
 
 $db_host = 'localhost';
+<<<<<<< HEAD
 $db_name = 'team_sales';
+=======
+$db_name = 'team_sales_v3';
+>>>>>>> origin/main
 $db_user = 'root';
 $db_pass = '';
 

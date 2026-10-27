@@ -17,7 +17,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'New password and confirmation do not match.';
     } else {
         $pdo = getDB();
+<<<<<<< HEAD
         $stmt = $pdo->prepare('SELECT password FROM users WHERE user_id = ? LIMIT 1');
+=======
+<<<<<<< HEAD
+        $stmt = $pdo->prepare('SELECT password FROM users WHERE id = ? LIMIT 1');
+=======
+        $stmt = $pdo->prepare('SELECT password FROM users WHERE user_id = ? LIMIT 1');
+>>>>>>> origin/main
+>>>>>>> origin/main
         $stmt->execute([$user['id'] ?? 0]);
         $dbUser = $stmt->fetch();
         $valid = $dbUser && password_verify($currentPassword, $dbUser['password']);
@@ -25,7 +33,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$valid) {
             $error = 'Current password is incorrect.';
         } else {
+<<<<<<< HEAD
             $stmt = $pdo->prepare('UPDATE users SET password = ? WHERE user_id = ?');
+=======
+<<<<<<< HEAD
+            $stmt = $pdo->prepare('UPDATE users SET password = ? WHERE id = ?');
+=======
+            $stmt = $pdo->prepare('UPDATE users SET password = ? WHERE user_id = ?');
+>>>>>>> origin/main
+>>>>>>> origin/main
             $stmt->execute([password_hash($newPassword, PASSWORD_DEFAULT), $user['id'] ?? 0]);
             $success = 'Password changed successfully.';
         }

@@ -36,7 +36,15 @@ The Inventory response should include at least:
 - `available`
 - optionally `unit_price`
 
+<<<<<<< HEAD
 Sales quotations store `finished_good_code` and `fg_id`; downstream Purchase Orders/Sales Orders retain their existing product reference columns. There are no Inventory tables added to this database.
+=======
+<<<<<<< HEAD
+Sales stores `product_code` and `inventory_product_id` as values/soft references. There are no Inventory tables added to this database.
+=======
+Sales quotations store `finished_good_code` and `fg_id`; downstream Purchase Orders/Sales Orders retain their existing product reference columns. There are no Inventory tables added to this database.
+>>>>>>> origin/main
+>>>>>>> origin/main
 
 Until Inventory provides the real endpoint, mock fallback is enabled for demonstrations. Set `$INVENTORY_API_MOCK_FALLBACK = false` after the real endpoint is confirmed.
 
@@ -73,10 +81,29 @@ Sales Admin:
 Username: `salesadmin`
 Password: `sales123`
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+System Admin:
+Username: `systemadmin`
+=======
+>>>>>>> origin/main
+>>>>>>> origin/main
 Password: `sales123`
 
 Change the password immediately after signing in.
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+## v1.18 Updates
+- Sales Admin no longer sees the sales modules or Sales Report.
+- Removed the duplicate Sales Admin Dashboard from the navigation; Sales Admin opens Customer Management and Approvals.
+- Moved system-wide User Activity monitoring out of Sales Admin and into the new System Admin area.
+- Added the System Admin role and demo account `systemadmin`.
+- Added server-side access guards so Sales Admin/System Admin cannot directly open the sales modules or reports.
+=======
+>>>>>>> origin/main
 ## v1.25 Updates (workflow)
 Quotation (Sales Staff) → Inventory check (automatic, `inventory_products` table) → **Sales Admin approves quotation** → **Purchase Order is created automatically** (PDF / Word export) → Sales Staff creates a **Sales Order from the PO** → **Sales Admin approves the Sales Order** → **Delivery is created automatically and Inventory is deducted** → Sales Staff **invoice** the approved order.
 
@@ -91,6 +118,10 @@ Quotation (Sales Staff) → Inventory check (automatic, `inventory_products` tab
 ## v1.18 Updates
 - Sales Admin no longer sees the sales modules or Sales Report.
 - Removed the duplicate Sales Admin Dashboard from the navigation; Sales Admin opens Customer Management and Approvals.
+<<<<<<< HEAD
+=======
+>>>>>>> origin/main
+>>>>>>> origin/main
 
 ## v1.17 Updates
 - Added search bars to Sales Quotation, Purchase Order, Sales Order, Delivery, Sales Return, Sales Invoice, Accounts Receivable, Collection, and Customer Balance.
@@ -104,6 +135,11 @@ Quotation (Sales Staff) → Inventory check (automatic, `inventory_products` tab
 
 ## Inventory (Standalone Demo)
 The Sales project includes a read-only `inventory_products` table for standalone XAMPP demonstrations. Run `database/inventory_table.sql` on an existing `team_sales` database. Quotations check this table automatically while `$INVENTORY_USE_LOCAL_TABLE` is enabled in `config/inventory_api.php`.
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> origin/main
 
 ## Customer Portal / Ordering Role
 
@@ -155,3 +191,7 @@ Run `database/migration_v1_31.sql` after backing up the database.
 
 ### Fresh database
 Import `database/schema.sql`. It contains table structures only and no demo records.
+<<<<<<< HEAD
+=======
+>>>>>>> origin/main
+>>>>>>> origin/main
