@@ -475,10 +475,18 @@ $requests = $pdo->query("
 
     </div>
 
+    <div class="module-search">
+        <input
+            type="search"
+            id="quotationRequestsSearch"
+            placeholder="Search request, customer, or product..."
+            aria-label="Search customer order requests"
+        >
+    </div>
 
     <div class="table-wrap">
 
-        <table>
+        <table id="quotationRequestsTable">
 
             <thead>
 
@@ -711,7 +719,7 @@ $requests = $pdo->query("
 
             <?php if (!$requests): ?>
 
-                <tr>
+            <tr class="empty-row">
 
                     <td colspan="6">
                         No customer orders are waiting for quotation.
@@ -720,6 +728,10 @@ $requests = $pdo->query("
                 </tr>
 
             <?php endif; ?>
+
+            <tr class="quotation-search-empty" hidden>
+                <td colspan="6">No matching customer requests.</td>
+            </tr>
 
             </tbody>
 
@@ -963,6 +975,34 @@ $requests = $pdo->query("
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    var requestSearch = document.getElementById('quotationRequestsSearch');
+    var requestTable = document.getElementById('quotationRequestsTable');
+
+    if (requestSearch && requestTable) {
+        requestSearch.addEventListener('input', function () {
+            var term = requestSearch.value.trim().toLowerCase();
+            var rows = Array.from(requestTable.querySelectorAll('tbody tr:not(.empty-row):not(.quotation-search-empty)'));
+            var matches = 0;
+
+            rows.forEach(function (row) {
+                var searchableText = Array.from(row.cells)
+                    .slice(0, 5)
+                    .map(function (cell) { return cell.textContent; })
+                    .join(' ')
+                    .toLowerCase();
+                var isMatch = !term || searchableText.includes(term);
+                row.style.display = isMatch ? '' : 'none';
+                if (isMatch) matches++;
+            });
+
+            var emptyState = requestTable.querySelector('.empty-row');
+            if (emptyState) emptyState.style.display = term ? 'none' : '';
+
+            var noMatches = requestTable.querySelector('.quotation-search-empty');
+            if (noMatches) noMatches.hidden = term === '' || matches > 0;
+        });
+    }
+
     function openQuotationModal(id) {
         var modal = document.getElementById(id);
         if (!modal) return;

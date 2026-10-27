@@ -260,8 +260,8 @@ include __DIR__ . '/includes/header.php'; ?>
                 <p class="eyebrow">BILLING / FINANCE</p>
                 <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start">
                     <div>
-                        <h2 style="margin:0"><?= htmlspecialchars($receipt['invoice_no']) ?></h2>
-                        <p class="muted"><?= htmlspecialchars($receipt['customer_name']) ?> · <?= htmlspecialchars($receipt['customer_code']) ?> · Order <?= htmlspecialchars($receipt['order_no']) ?></p>
+                        <h2 style="margin:0"><?= htmlspecialchars($receipt['customer_name']) ?></h2>
+                        <p class="muted">Invoice <?= htmlspecialchars($receipt['invoice_no']) ?> · Sales Order <?= htmlspecialchars($receipt['order_no']) ?> · Customer Code <?= htmlspecialchars($receipt['customer_code']) ?></p>
                     </div>
                     <span class="badge <?= $status === 'Paid' ? 'success' : ($status === 'Partially Paid' ? 'warning' : 'danger') ?>"><?= $status ?></span>
                 </div>

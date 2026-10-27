@@ -5,6 +5,12 @@ requireLogin();
 $user = currentUser();
 $pageTitle = $pageTitle ?? 'Dashboard';
 $currentPage = basename($_SERVER['PHP_SELF']);
+$responsivePageClasses = [
+    'inventory.php' => 'inventory-responsive',
+    'inventory_stockout_approval.php' => 'stockout-responsive',
+    'reports.php' => 'reports-responsive',
+];
+$responsivePageClass = $responsivePageClasses[$currentPage] ?? '';
 $coreModules = [
     'quotations.php' => ['label' => 'Sales Quotation', 'icon' => '▤'],
     'purchase_orders.php' => ['label' => 'Purchase Order', 'icon' => '▣'],
@@ -47,7 +53,7 @@ $isSystemAdmin = in_array(($user['role'] ?? ''), ['System Admin', 'Administrator
 <body>
     <div class="app-shell <?= $isCustomer ? 'customer-shell' : '' ?>">
         <?php include __DIR__ . '/sidebar.php'; ?>
-        <main class="main-content <?= $isCustomer ? 'customer-main' : '' ?>">
+        <main class="main-content <?= $isCustomer ? 'customer-main' : '' ?> <?= htmlspecialchars($responsivePageClass) ?>">
             <header class="topbar">
                 <button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
                 <div class="banner">

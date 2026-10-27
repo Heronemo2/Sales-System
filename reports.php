@@ -170,43 +170,70 @@ if ($selectedCustomerId) {
 </div><br>
 
 <?php if ($selectedCustomer): ?>
-    <div class="panel">
-        <div class="panel-head">
-            <div>
-                <p class="eyebrow" style="color:black;">CUSTOMER FULL FLOW</p>
-                <h2>Customer Name: <?= htmlspecialchars($selectedCustomer['customer_name']) ?></h2>
-            </div><a class="text-link" href="reports.php?year=<?= $selectedYear ?>">Close</a>
-        </div>
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Quotation</th>
-                        <th>PO</th>
-                        <th>Sales Order</th>
-                        <th>Delivery</th>
-                        <th>Invoice</th>
-                        <th>Collection</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($flowRows as $r): ?>
+    <div class="modal-backdrop open customer-flow-modal" id="customerFlowModal">
+        <section class="panel customer-flow-dialog" role="dialog" aria-modal="true" aria-labelledby="customerFlowTitle">
+            <div class="panel-head">
+                <div>
+                    <p class="eyebrow" style="color:black;">CUSTOMER FULL FLOW</p>
+                    <h2 id="customerFlowTitle">Customer Name: <?= htmlspecialchars($selectedCustomer['customer_name']) ?></h2>
+                </div>
+                <button class="modal-close" type="button" aria-label="Close customer flow" data-close-flow>×</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
                         <tr>
-                            <td><?= htmlspecialchars($r['quotation_no'] ?? '—') ?><br><span class="badge <?= badgeClass($r['quotation_status'] ?? '') ?>"><?= htmlspecialchars($r['quotation_status'] ?? '—') ?></span></td>
-                            <td><?= htmlspecialchars($r['po_no'] ?? '—') ?><br><span class="badge <?= badgeClass($r['po_status'] ?? '') ?>"><?= htmlspecialchars($r['po_status'] ?? '—') ?></span></td>
-                            <td><?= htmlspecialchars($r['order_no'] ?? '—') ?><br><span class="badge <?= badgeClass($r['order_status'] ?? '') ?>"><?= htmlspecialchars($r['order_status'] ?? '—') ?></span></td>
-                            <td><?= htmlspecialchars($r['delivery_no'] ?? '—') ?><br><span class="badge <?= badgeClass($r['delivery_status'] ?? '') ?>"><?= htmlspecialchars($r['delivery_status'] ?? '—') ?></span></td>
-                            <td><?= htmlspecialchars($r['invoice_no'] ?? '—') ?><br><span class="badge <?= badgeClass($r['invoice_status'] ?? '') ?>"><?= htmlspecialchars($r['invoice_status'] ?? '—') ?></span></td>
-                            <td><?= htmlspecialchars($r['collection_nos'] ?? '—') ?></td>
+                            <th>Quotation</th>
+                            <th>PO</th>
+                            <th>Sales Order</th>
+                            <th>Delivery</th>
+                            <th>Invoice</th>
+                            <th>Collection</th>
                         </tr>
-                    <?php endforeach; ?>
-                    <?php if (!$flowRows): ?><tr>
-                            <td colspan="6">No transaction flow found for this customer.</td>
-                        </tr><?php endif; ?>
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($flowRows as $r): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($r['quotation_no'] ?? '—') ?><br><span class="badge <?= badgeClass($r['quotation_status'] ?? '') ?>"><?= htmlspecialchars($r['quotation_status'] ?? '—') ?></span></td>
+                                <td><?= htmlspecialchars($r['po_no'] ?? '—') ?><br><span class="badge <?= badgeClass($r['po_status'] ?? '') ?>"><?= htmlspecialchars($r['po_status'] ?? '—') ?></span></td>
+                                <td><?= htmlspecialchars($r['order_no'] ?? '—') ?><br><span class="badge <?= badgeClass($r['order_status'] ?? '') ?>"><?= htmlspecialchars($r['order_status'] ?? '—') ?></span></td>
+                                <td><?= htmlspecialchars($r['delivery_no'] ?? '—') ?><br><span class="badge <?= badgeClass($r['delivery_status'] ?? '') ?>"><?= htmlspecialchars($r['delivery_status'] ?? '—') ?></span></td>
+                                <td><?= htmlspecialchars($r['invoice_no'] ?? '—') ?><br><span class="badge <?= badgeClass($r['invoice_status'] ?? '') ?>"><?= htmlspecialchars($r['invoice_status'] ?? '—') ?></span></td>
+                                <td><?= htmlspecialchars($r['collection_nos'] ?? '—') ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php if (!$flowRows): ?><tr>
+                                <td colspan="6">No transaction flow found for this customer.</td>
+                            </tr><?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
+    <script>
+        (function () {
+            var modal = document.getElementById('customerFlowModal');
+            if (!modal) return;
+
+            document.body.classList.add('modal-open');
+
+            function closeFlow() {
+                modal.classList.remove('open');
+                document.body.classList.remove('modal-open');
+                var url = new URL(window.location.href);
+                url.searchParams.delete('customer_id');
+                window.history.replaceState({}, '', url);
+            }
+
+            modal.querySelector('[data-close-flow]').addEventListener('click', closeFlow);
+            modal.addEventListener('click', function (event) {
+                if (event.target === modal) closeFlow();
+            });
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && modal.classList.contains('open')) closeFlow();
+            });
+        })();
+    </script>
 <?php endif; ?>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

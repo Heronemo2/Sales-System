@@ -31,7 +31,7 @@ $st = $pdo->prepare("
 
         (
             SELECT fg.item_name
-            FROM inventory_management.finished_goods fg
+            FROM inventory_system.finished_goods fg
             WHERE fg.item_code COLLATE utf8mb4_unicode_ci
                   = po.product_code COLLATE utf8mb4_unicode_ci
             LIMIT 1

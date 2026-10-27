@@ -198,3 +198,120 @@ input:focus,select:focus,textarea:focus,.form-grid input:focus,.form-grid select
 .login-page.login-split-page .login-terms p{color:#334155!important}
 .login-page.login-split-page .terms-agree{color:#334155!important}
 @media(max-width:1050px){.login-page.login-split-page .login-split{grid-template-columns:1fr!important}.login-page.login-split-page .login-right{display:none!important}}
+.billing-hero .eyebrow.light{color:#fecaca!important}
+
+@media(max-width:1050px){
+  .inventory-responsive .panel,
+  .stockout-responsive .panel,
+  .reports-responsive .panel,
+  .reports-responsive .report-card{min-width:0}
+  .inventory-responsive .table-wrap,
+  .stockout-responsive .table-wrap,
+  .reports-responsive .table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .inventory-responsive .table-wrap table{min-width:900px}
+  .stockout-responsive .table-wrap table{min-width:720px}
+  .reports-responsive .table-wrap table{min-width:640px}
+}
+
+@media(max-width:760px){
+  .inventory-responsive,
+  .stockout-responsive,
+  .reports-responsive{padding-left:12px!important;padding-right:12px!important}
+  .inventory-responsive .panel,
+  .stockout-responsive .panel,
+  .reports-responsive .panel,
+  .reports-responsive .report-card{padding:14px!important}
+  .inventory-responsive .panel-head,
+  .stockout-responsive .panel-head,
+  .reports-responsive .panel-head{align-items:stretch!important;flex-direction:column!important;gap:12px!important}
+  .inventory-responsive .panel-head>.primary-btn,
+  .stockout-responsive .panel-head>.primary-btn,
+  .reports-responsive .page-toolbar>.primary-btn{width:100%;text-align:center}
+  .stockout-responsive .stats-grid{grid-template-columns:minmax(0,1fr)!important}
+  .reports-responsive .report-grid{grid-template-columns:minmax(0,1fr)!important}
+  .reports-responsive .chart-card{overflow-x:auto}
+  .reports-responsive .chart-card>div:first-child{min-width:0}
+  .reports-responsive .chart-card .bars,
+  .reports-responsive .chart-card .bar-labels{min-width:560px}
+  .reports-responsive .page-toolbar{align-items:stretch!important}
+}
+
+.customer-flow-modal{z-index:1000!important;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-behavior:smooth}
+.customer-flow-modal::-webkit-scrollbar,
+.customer-flow-dialog::-webkit-scrollbar,
+.customer-flow-dialog .table-wrap::-webkit-scrollbar{display:none}
+.customer-flow-dialog{width:min(1500px,96vw)!important;max-height:90vh;overflow:auto;position:relative;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scroll-behavior:smooth}
+.customer-flow-dialog .panel-head{position:relative;align-items:flex-start!important;flex-direction:row!important;padding-right:42px}
+.customer-flow-dialog .modal-close{position:absolute;top:0;right:0}
+.customer-flow-dialog .table-wrap{max-width:100%;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scroll-behavior:smooth}
+@media(max-width:760px){
+  .customer-flow-modal{align-items:flex-start!important;padding:12px!important}
+  .customer-flow-dialog{width:100%!important;max-height:calc(100vh - 24px);padding:14px!important}
+  .customer-flow-dialog .panel-head{flex-direction:row!important}
+  .customer-flow-dialog .table-wrap table{min-width:720px}
+}
+
+.login-page.login-split-page{
+  min-height:100vh;
+  min-height:100svh;
+  overflow-y:auto;
+  scrollbar-width:none;
+  background:#800000!important;
+}
+.login-page.login-split-page::-webkit-scrollbar{display:none}
+.login-page.login-split-page .login-split{
+  display:flex!important;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  min-height:100svh;
+  padding:clamp(10px,2vh,20px) 16px;
+}
+.login-page.login-split-page .login-left{
+  width:100%;
+  min-height:0;
+  padding:0!important;
+  background:transparent!important;
+  overflow:visible;
+}
+.login-page.login-split-page .login-panel{
+  width:min(500px,100%)!important;
+  padding:clamp(18px,3vh,28px)!important;
+  border:1px solid rgba(255,255,255,.55);
+  border-radius:18px;
+  background:#fff!important;
+  box-shadow:0 24px 70px rgba(15,23,42,.3);
+  color:#1f2937!important;
+}
+.login-page.login-split-page .login-brand{margin-bottom:clamp(10px,2vh,18px)!important}
+.login-page.login-split-page .login-form br{display:none}
+.login-page.login-split-page .login-form>label{margin-top:10px!important;margin-bottom:8px!important}
+.login-page.login-split-page .login-form input:not([type="checkbox"]){height:clamp(36px,5.5vh,42px)!important}
+.login-page.login-split-page .login-form .primary-btn{height:40px!important;margin-top:12px!important}
+.login-page.login-split-page .login-brand strong{color:#172033!important}
+.login-page.login-split-page .login-brand span{color:#64748b!important}
+.login-page.login-split-page .login-heading .eyebrow{color:#9f1239!important}
+.login-page.login-split-page .login-heading h1{color:#172033!important}
+.login-page.login-split-page .login-heading p{color:#475569!important}
+.login-page.login-split-page .login-form>label{color:#334155!important}
+.login-page.login-split-page .login-terms input[type="checkbox"]{width:16px!important;height:16px!important;min-width:16px!important;min-height:16px!important;padding:0!important;margin:0!important;flex:0 0 16px!important}
+.login-page.login-split-page .login-terms{background:#f8fafc!important;border-color:#e2e8f0!important;color:#334155!important}
+.login-page.login-split-page #termsContent{overscroll-behavior:contain}
+.login-page.login-split-page .login-terms>div:first-child{color:#172033!important}
+.login-page.login-split-page .login-terms p{color:#334155!important}
+.login-page.login-split-page .termsread{color:#9f1239!important}
+.login-page.login-split-page .terms-agree{color:#334155!important}
+.login-page.login-split-page .login-right{display:none!important}
+@media(max-width:520px){
+  .login-page.login-split-page .login-split{padding:16px 12px}
+  .login-page.login-split-page .login-panel{padding:18px!important}
+  .login-page.login-split-page .login-heading h1{font-size:27px!important}
+}
+@media(max-height:680px){
+  .login-page.login-split-page .login-split{align-items:flex-start}
+  .login-page.login-split-page .login-panel{padding:14px 22px!important}
+  .login-page.login-split-page .login-brand{margin-bottom:8px!important}
+  .login-page.login-split-page .login-brand .brand-logo{width:48px!important;height:48px!important}
+  .login-page.login-split-page .login-form>label{margin-top:6px!important;margin-bottom:6px!important}
+  .login-page.login-split-page .login-form .primary-btn{margin-top:8px!important}
+}

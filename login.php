@@ -104,29 +104,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     Terms of Service
                 </div>
 
-                <div id="termsPreview">
-                    <p style="font-size:12px; line-height:1.5; margin:0 0 6px;">
-                        This system is the property of [Company Name]
-                    </p>
-                    <button class="termsread" type="button" id="termsToggle">
-                        Read full Terms
-                    </button>
-                </div>
+                <div id="termsContent">
+                    <div id="termsPreview">
+                        <p style="font-size:12px; line-height:1.5; margin:0 0 6px;">
+                            This system is the property of [Company Name]
+                        </p>
+                        <button class="termsread" type="button" id="termsToggle">
+                            Read full Terms
+                        </button>
+                    </div>
 
-                <div id="termsFull" style="display:none;">
-                    <p style="font-size:12px; line-height:1.5; margin:0 0 6px;">
-                        This system is the property of [Company Name]
-                        and is restricted to authorized users for business purposes only.
-                        By logging in, you agree to comply with the company's Information
-                        Security and Acceptable Use Policies. Unauthorized access or misuse
-                        is strictly prohibited and may result in disciplinary action up to
-                        termination, as well as civil or criminal liability. Activities on
-                        this system are monitored and logged.
-                    </p>
-                    <button class="termsread" type="button" id="termsHide"
-                            style="border:0; background:none; padding:0; cursor:pointer; text-decoration:underline; font-size:12px;">
-                        Show less
-                    </button>
+                    <div id="termsFull" style="display:none;">
+                        <p style="font-size:12px; line-height:1.5; margin:0 0 6px;">
+                            This system is the property of [Company Name]
+                            and is restricted to authorized users for business purposes only.
+                            By logging in, you agree to comply with the company's Information
+                            Security and Acceptable Use Policies. Unauthorized access or misuse
+                            is strictly prohibited and may result in disciplinary action up to
+                            termination, as well as civil or criminal liability. Activities on
+                            this system are monitored and logged.
+                        </p>
+                        <button class="termsread" type="button" id="termsHide"
+                                style="border:0; background:none; padding:0; cursor:pointer; text-decoration:underline; font-size:12px;">
+                            Show less
+                        </button>
+                    </div>
                 </div>
 
                 <label class="terms-agree">
@@ -158,11 +160,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     document.addEventListener('DOMContentLoaded', function () {
         const preview = document.getElementById('termsPreview');
         const full = document.getElementById('termsFull');
+        const termsContent = document.getElementById('termsContent');
         const toggle = document.getElementById('termsToggle');
         const hide = document.getElementById('termsHide');
 
-        if (toggle && hide && preview && full) {
+        if (toggle && hide && preview && full && termsContent) {
             toggle.addEventListener('click', function () {
+                termsContent.style.height = preview.offsetHeight + 'px';
+                termsContent.style.overflowY = 'auto';
                 preview.style.display = 'none';
                 full.style.display = 'block';
             });
@@ -170,6 +175,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             hide.addEventListener('click', function () {
                 full.style.display = 'none';
                 preview.style.display = 'block';
+                termsContent.style.height = '';
+                termsContent.style.overflowY = '';
             });
         }
     });
