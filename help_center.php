@@ -35,18 +35,8 @@ include __DIR__ . '/includes/header.php';
 
         <section class="panel help-contact">
             <p class="eyebrow">NEED MORE HELP?</p>
-<<<<<<< HEAD
             <h2>Contact your Sales Admin</h2>
             <p>If you encounter a database, login, or permission problem, provide your Sales Admin with the page name and the error message you received.</p>
-=======
-<<<<<<< HEAD
-            <h2>Contact your system administrator</h2>
-            <p>If you encounter a database, login, or permission problem, provide the administrator with the page name and the error message you received.</p>
-=======
-            <h2>Contact your Sales Admin</h2>
-            <p>If you encounter a database, login, or permission problem, provide your Sales Admin with the page name and the error message you received.</p>
->>>>>>> origin/main
->>>>>>> origin/main
         </section>
     </div>
 </section>

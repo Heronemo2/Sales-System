@@ -1,11 +1,7 @@
 <?php
-<<<<<<< HEAD
 session_name('TEAM_SALES_SESSID');
 session_start();
 
-=======
-session_start();
->>>>>>> origin/main
 require_once __DIR__ . '/config/database.php';
 
 if (!empty($_SESSION['user'])) {
@@ -24,7 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$termsAccepted) {
         $error = 'You must accept the Terms of Service before signing in.';
     } elseif ($pdo) {
-<<<<<<< HEAD
         $stmt = $pdo->prepare("
     SELECT *
     FROM users
@@ -32,13 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       AND role IN ('Sales Admin','Sales Staff')
     LIMIT 1
 ");
-=======
-<<<<<<< HEAD
-        $stmt = $pdo->prepare("SELECT id, full_name AS name, username, password, role, avatar_path FROM users WHERE username = ? AND status = 'Active' LIMIT 1");
-=======
-        $stmt = $pdo->prepare("SELECT user_id AS id, full_name AS name, username, password, role, customer_id, avatar_path FROM users WHERE username = ? AND status = 'Active' LIMIT 1");
->>>>>>> origin/main
->>>>>>> origin/main
         $stmt->execute([$username]);
         $user = $stmt->fetch();
 
@@ -49,7 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user'] = $user;
             $_SESSION['terms_accepted'] = true;
             $_SESSION['terms_version'] = '1.0';
-<<<<<<< HEAD
             $pdo->prepare('UPDATE users SET last_login = NOW() WHERE user_id = ?')->execute([(int)$user['user_id']]);
             try { $pdo->prepare('INSERT INTO activity_logs (user_id, action, module, record_id, description, created_at) VALUES (?,?,?,?,?,NOW())')->execute([(int)$user['id'], 'Sign In', 'Authentication', null, 'User signed in']); } catch (Throwable $e) {}
 
@@ -57,27 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: dashboard.php');
             } else {
                 header('Location: login.php');
-=======
-<<<<<<< HEAD
-            $pdo->prepare('UPDATE users SET last_login = NOW() WHERE id = ?')->execute([(int)$user['id']]);
-            try { $pdo->prepare('INSERT INTO activity_logs (user_id, action, module, record_id, description, created_at) VALUES (?,?,?,?,?,NOW())')->execute([(int)$user['id'], 'Sign In', 'Authentication', null, 'User signed in']); } catch (Throwable $e) {}
-
-            if (in_array($user['role'], ['System Admin', 'Administrator'], true)) {
-                header('Location: system_admin.php');
-            } elseif ($user['role'] === 'Sales Admin') {
-                header('Location: admin_customers.php');
-=======
-            $pdo->prepare('UPDATE users SET last_login = NOW() WHERE user_id = ?')->execute([(int)$user['id']]);
-            try { $pdo->prepare('INSERT INTO activity_logs (user_id, action, module, record_id, description, created_at) VALUES (?,?,?,?,?,NOW())')->execute([(int)$user['id'], 'Sign In', 'Authentication', null, 'User signed in']); } catch (Throwable $e) {}
-
-            if ($user['role'] === 'Sales Admin') {
-                header('Location: admin_customers.php');
-            } elseif ($user['role'] === 'Customer') {
-                header('Location: customer_portal.php');
->>>>>>> origin/main
-            } else {
-                header('Location: dashboard.php');
->>>>>>> origin/main
             }
             exit;
         }
@@ -98,10 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
-<<<<<<< HEAD
     <link rel="stylesheet" href="assets/css/redesign.css?v=20261008">
-=======
->>>>>>> origin/main
     <link rel="icon" href="assets/img/logo.png">
 </head>
 <body class="login-page login-split-page">

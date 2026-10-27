@@ -15,7 +15,6 @@ $pdo = getDB();
 $id = (int) ($_GET['id'] ?? 0);
 $format = strtolower($_GET['format'] ?? 'pdf');
 
-<<<<<<< HEAD
 $st = $pdo->prepare("
     SELECT 
         po.*,
@@ -48,14 +47,6 @@ $st = $pdo->prepare("
 
     WHERE po.po_id = ?
 ");
-=======
-$st = $pdo->prepare("SELECT po.*, q.quotation_no, q.valid_until, c.customer_name, c.customer_code, c.address, c.city, c.province, c.phone, c.email, c.payment_terms,
-                            (SELECT product_name FROM inventory_management.finished_goods ip WHERE ip.finished_good_code = po.product_code LIMIT 1) AS product_name
-                     FROM purchase_orders po
-                     JOIN sales_quotations q ON q.sq_id = po.quotation_id
-                     JOIN customers c ON c.cus_id = po.customer_id
-                     WHERE po.po_id = ?");
->>>>>>> origin/main
 $st->execute([$id]);
 $po = $st->fetch();
 if (!$po) {
@@ -87,12 +78,8 @@ th{background:#111;color:#fff;text-align:left;padding:6px;border:1px solid #111}
 <table><tr><th>Product</th><th class="r">Qty</th><th class="r">Unit Price</th><th class="r">Amount</th></tr>
 <tr><td>' . $h($product) . '</td><td class="r">' . $qty . '</td><td class="r">' . $h($money($unit)) . '</td><td class="r">' . $h($money($total)) . '</td></tr>
 <tr><td colspan="3" class="r"><b>TOTAL</b></td><td class="r"><b>' . $h($money($total)) . '</b></td></tr></table>
-<<<<<<< HEAD
 <br><br><p>Prepared by: ______________________ &nbsp;&nbsp;&nbsp;&nbsp; Approved by: ______________________</p><script src="assets/js/pagination.js?v=20261008"></script>
 </body></html>';
-=======
-<br><br><p>Prepared by: ______________________ &nbsp;&nbsp;&nbsp;&nbsp; Approved by: ______________________</p></body></html>';
->>>>>>> origin/main
     exit;
 }
 

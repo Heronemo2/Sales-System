@@ -1797,11 +1797,6 @@ tbody tr:hover {
 }
 .login-form .terms-agree { display: flex; align-items: center; gap: 10px; font-weight: 500; }
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
->>>>>>> origin/main
 
 
 /* ============================================================
@@ -2246,7 +2241,6 @@ tbody tr:hover {
   .customer-balance-box .balance-highlight{grid-column:auto}
   .receipt-collection-row{grid-template-columns:1fr 1fr}
 }
-<<<<<<< HEAD
 /* ================================
    QUOTATION FIELDS
 ================================ */
@@ -2678,6 +2672,3 @@ tbody tr:hover td{background:#fcfcfc !important}
         padding: 0 9px;
     }
 }
-=======
->>>>>>> origin/main
->>>>>>> origin/main

@@ -1,5 +1,4 @@
 <?php
-<<<<<<< HEAD
 
 session_name('TEAM_SALES_SESSID');
 session_start();
@@ -24,11 +23,3 @@ session_destroy();
 
 header('Location: login.php');
 exit;
-=======
-session_start();
-$_SESSION = [];
-session_destroy();
-header('Location: login.php');
-exit;
-?>
->>>>>>> origin/main

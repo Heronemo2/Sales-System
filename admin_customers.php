@@ -14,15 +14,7 @@ if (($_GET['ajax'] ?? '') === 'transactions') {
     header('Content-Type: application/json');
     $cid = (int) ($_GET['id'] ?? 0);
 
-<<<<<<< HEAD
     $cs = $pdo->prepare('SELECT customer_code, customer_name FROM customers WHERE cus_id = ?');
-=======
-<<<<<<< HEAD
-    $cs = $pdo->prepare('SELECT customer_code, customer_name FROM customers WHERE id = ?');
-=======
-    $cs = $pdo->prepare('SELECT customer_code, customer_name FROM customers WHERE cus_id = ?');
->>>>>>> origin/main
->>>>>>> origin/main
     $cs->execute([$cid]);
     $cust = $cs->fetch();
     if (!$cust) {
@@ -42,20 +34,6 @@ if (($_GET['ajax'] ?? '') === 'transactions') {
           FROM sales_orders o WHERE o.customer_id = :c3
         UNION ALL
         SELECT 'Invoice', i.invoice_no, i.invoice_date, i.total_amount, i.status, i.created_at
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-          FROM sales_invoices i JOIN sales_orders o ON o.id = i.order_id WHERE o.customer_id = :c4
-        UNION ALL
-        SELECT CONCAT('Payment (', col.method, ')'), col.collection_no, col.collection_date, col.amount, 'Paid', col.created_at
-          FROM collections col
-          JOIN sales_invoices i ON i.id = col.invoice_id
-          JOIN sales_orders o ON o.id = i.order_id WHERE o.customer_id = :c5
-        UNION ALL
-        SELECT 'Return', r.return_no, r.return_date, r.total_amount, r.status, r.created_at
-          FROM sales_returns r JOIN sales_orders o ON o.id = r.order_id WHERE o.customer_id = :c6
-=======
->>>>>>> origin/main
           FROM sales_invoices i JOIN sales_orders o ON o.so_id = i.order_id WHERE o.customer_id = :c4
         UNION ALL
         SELECT CONCAT('Payment (', col.method, ')'), col.collection_no, col.collection_date, col.amount, 'Paid', col.created_at
@@ -65,10 +43,6 @@ if (($_GET['ajax'] ?? '') === 'transactions') {
         UNION ALL
         SELECT 'Return', r.return_no, r.return_date, r.total_amount, r.status, r.created_at
           FROM sales_returns r JOIN sales_orders o ON o.so_id = r.order_id WHERE o.customer_id = :c6
-<<<<<<< HEAD
-=======
->>>>>>> origin/main
->>>>>>> origin/main
         ORDER BY tx_date DESC, created_at DESC
     ";
     $st = $pdo->prepare($sql);
@@ -126,15 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Please enter a valid email address.';
         } else {
-<<<<<<< HEAD
             $stmt = $pdo->prepare('UPDATE customers SET customer_name = ?, phone = ?, email = ?, address = ? WHERE cus_id = ?');
-=======
-<<<<<<< HEAD
-            $stmt = $pdo->prepare('UPDATE customers SET customer_name = ?, phone = ?, email = ?, address = ? WHERE id = ?');
-=======
-            $stmt = $pdo->prepare('UPDATE customers SET customer_name = ?, phone = ?, email = ?, address = ? WHERE cus_id = ?');
->>>>>>> origin/main
->>>>>>> origin/main
             $stmt->execute([$name, $phone, $email, $address, $id]);
             logActivity($pdo, 'Update', 'Customer', 'Edited customer ' . $name, $id);
             header('Location: admin_customers.php?updated=1');
@@ -142,23 +108,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'toggle_status') {
         $id = (int) ($_POST['id'] ?? 0);
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-        $stmt = $pdo->prepare("UPDATE customers SET status = IF(status = 'Active', 'Inactive', 'Active') WHERE id = ?");
-        $stmt->execute([$id]);
-        if ($stmt->rowCount()) {
-            $now = $pdo->prepare('SELECT customer_code, status FROM customers WHERE id = ?');
-=======
->>>>>>> origin/main
         $stmt = $pdo->prepare("UPDATE customers SET status = IF(status = 'Active', 'Inactive', 'Active') WHERE cus_id = ?");
         $stmt->execute([$id]);
         if ($stmt->rowCount()) {
             $now = $pdo->prepare('SELECT customer_code, status FROM customers WHERE cus_id = ?');
-<<<<<<< HEAD
-=======
->>>>>>> origin/main
->>>>>>> origin/main
             $now->execute([$id]);
             $row = $now->fetch();
             logActivity($pdo, $row['status'] === 'Active' ? 'Activate' : 'Deactivate', 'Customer', ($row['status'] === 'Active' ? 'Activated ' : 'Deactivated ') . $row['customer_code'], $id);
@@ -186,23 +139,10 @@ $customers = $pdo->query("
                    SUM(i.amount_paid)  AS total_paid,
                    SUM(i.total_amount - i.amount_paid) AS outstanding
               FROM sales_orders o
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-              JOIN sales_invoices i ON i.order_id = o.id
-             GROUP BY o.customer_id
-      ) b ON b.customer_id = c.id
-     ORDER BY c.id DESC
-=======
->>>>>>> origin/main
               JOIN sales_invoices i ON i.order_id = o.so_id
              GROUP BY o.customer_id
       ) b ON b.customer_id = c.cus_id
      ORDER BY c.cus_id DESC
-<<<<<<< HEAD
-=======
->>>>>>> origin/main
->>>>>>> origin/main
 ")->fetchAll();
 
 $statusMsg = ['activated' => 'Customer activated.', 'deactivated' => 'Customer deactivated. They will no longer appear when creating new quotations.'];
@@ -231,15 +171,7 @@ $statusMsg = ['activated' => 'Customer activated.', 'deactivated' => 'Customer d
             <td><span class="badge <?= badgeClass($c['status']) ?>"><?= htmlspecialchars($c['status']) ?></span></td>
             <td data-no-search>
                 <div class="inline-actions">
-<<<<<<< HEAD
                     <button type="button" class="table-action js-history" data-open-modal="historyModal" data-id="<?= (int) $c['cus_id'] ?>">History</button>
-=======
-<<<<<<< HEAD
-                    <button type="button" class="table-action js-history" data-open-modal="historyModal" data-id="<?= (int) $c['id'] ?>">History</button>
-=======
-                    <button type="button" class="table-action js-history" data-open-modal="historyModal" data-id="<?= (int) $c['cus_id'] ?>">History</button>
->>>>>>> origin/main
->>>>>>> origin/main
                     <button type="button" class="table-action js-balance" data-open-modal="balanceModal"
                         data-name="<?= htmlspecialchars($c['customer_name'] ?? '', ENT_QUOTES) ?>"
                         data-code="<?= htmlspecialchars($c['customer_code'], ENT_QUOTES) ?>"
@@ -250,30 +182,14 @@ $statusMsg = ['activated' => 'Customer activated.', 'deactivated' => 'Customer d
                         data-limit="<?= htmlspecialchars(peso($creditLimit), ENT_QUOTES) ?>"
                         data-available="<?= htmlspecialchars(peso(max(0, $creditLimit - (float) $c['outstanding'])), ENT_QUOTES) ?>">Balance</button>
                     <button type="button" class="table-action js-edit" data-open-modal="editCustomerModal"
-<<<<<<< HEAD
                         data-id="<?= (int) $c['cus_id'] ?>"
-=======
-<<<<<<< HEAD
-                        data-id="<?= (int) $c['id'] ?>"
-=======
-                        data-id="<?= (int) $c['cus_id'] ?>"
->>>>>>> origin/main
->>>>>>> origin/main
                         data-name="<?= htmlspecialchars($c['customer_name'] ?? '', ENT_QUOTES) ?>"
                         data-phone="<?= htmlspecialchars($c['phone'] ?? '', ENT_QUOTES) ?>"
                         data-email="<?= htmlspecialchars($c['email'] ?? '', ENT_QUOTES) ?>"
                         data-address="<?= htmlspecialchars($c['address'] ?? '', ENT_QUOTES) ?>">Edit</button>
                     <form method="POST" onsubmit="return confirm('<?= $isActive ? 'Deactivate' : 'Activate' ?> this customer?');">
                         <input type="hidden" name="action" value="toggle_status">
-<<<<<<< HEAD
                         <input type="hidden" name="id" value="<?= (int) $c['cus_id'] ?>">
-=======
-<<<<<<< HEAD
-                        <input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
-=======
-                        <input type="hidden" name="id" value="<?= (int) $c['cus_id'] ?>">
->>>>>>> origin/main
->>>>>>> origin/main
                         <button type="submit" class="table-action <?= $isActive ? 'reject' : 'approve' ?>"><?= $isActive ? 'Deactivate' : 'Activate' ?></button>
                     </form>
                 </div>

@@ -6,7 +6,6 @@ require_once __DIR__ . '/includes/simple_pdf.php';
 requireLogin();
 $pdo=getDB();
 $id=(int)($_GET['id']??0);
-<<<<<<< HEAD
 $st=$pdo->prepare("
     SELECT 
         q.*,
@@ -27,9 +26,6 @@ $st=$pdo->prepare("
     WHERE q.sq_id = ?
     LIMIT 1
 ");
-=======
-$st=$pdo->prepare("SELECT q.*, c.customer_name,c.email,c.phone,c.address,c.city,c.province FROM sales_quotations q JOIN customers c ON c.cus_id=q.customer_id WHERE q.sq_id=? LIMIT 1");
->>>>>>> origin/main
 $st->execute([$id]); $q=$st->fetch();
 if(!$q){http_response_code(404);exit('Quotation not found.');}
 $user=currentUser();
@@ -45,7 +41,6 @@ $pdf->text(48,213,trim(($q['address']??'').' '.($q['city']??'').' '.($q['provinc
 $pdf->text(48,232,'Email: '.($q['email']??'—').'   Phone: '.($q['phone']??'—'),9);
 $pdf->rect(48,260,499,34,[0.94,0.94,0.94]);
 $pdf->text(58,281,'ITEM',9,true); $pdf->text(290,281,'QTY',9,true); $pdf->text(365,281,'UNIT PRICE',9,true); $pdf->text(470,281,'TOTAL',9,true);
-<<<<<<< HEAD
 $pdf->text(
     58,
     315,
@@ -60,9 +55,6 @@ $pdf->text(
     10,
     true
 );
-=======
-$pdf->text(58,315,$q['finished_good_code'],10,true); $pdf->text(295,315,(string)$q['quantity'],10);
->>>>>>> origin/main
 $unit=$q['quantity']?(float)$q['total_amount']/(int)$q['quantity']:0;
 $pdf->text(365,315,'PHP '.number_format($unit,2),10); $pdf->textRight(545,315,'PHP '.number_format((float)$q['total_amount'],2),10,true);
 $pdf->line(48,332,547,332,0.7);
