@@ -22,6 +22,17 @@ function currentUser(): array {
     return $user;
 }
 
+<<<<<<< HEAD
+=======
+function requireCustomer(): void {
+    requireLogin();
+    if (currentUser()['role'] !== 'Customer') {
+        header('Location: dashboard.php');
+        exit;
+    }
+}
+
+>>>>>>> origin/main
 function requireSalesAdmin(): void {
     requireLogin();
     if (currentUser()['role'] !== 'Sales Admin') {
@@ -30,6 +41,7 @@ function requireSalesAdmin(): void {
     }
 }
 
+<<<<<<< HEAD
 function requireSystemAdmin(): void {
     requireLogin();
     if (!in_array(currentUser()['role'], ['System Admin', 'Administrator'], true)) {
@@ -42,6 +54,17 @@ function requireSalesWorkspace(): void {
     requireLogin();
     if (in_array(currentUser()['role'], ['Sales Admin', 'System Admin', 'Administrator'], true)) {
         header('Location: ' . (in_array(currentUser()['role'], ['System Admin', 'Administrator'], true) ? 'system_admin.php' : 'admin_customers.php'));
+=======
+
+function requireSalesWorkspace(): void {
+    requireLogin();
+    if (currentUser()['role'] === 'Customer') {
+        header('Location: customer_portal.php');
+        exit;
+    }
+    if (currentUser()['role'] === 'Sales Admin') {
+        header('Location: admin_customers.php');
+>>>>>>> origin/main
         exit;
     }
 }

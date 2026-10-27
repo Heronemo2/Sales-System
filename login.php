@@ -18,7 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$termsAccepted) {
         $error = 'You must accept the Terms of Service before signing in.';
     } elseif ($pdo) {
+<<<<<<< HEAD
         $stmt = $pdo->prepare("SELECT id, full_name AS name, username, password, role, avatar_path FROM users WHERE username = ? AND status = 'Active' LIMIT 1");
+=======
+        $stmt = $pdo->prepare("SELECT user_id AS id, full_name AS name, username, password, role, customer_id, avatar_path FROM users WHERE username = ? AND status = 'Active' LIMIT 1");
+>>>>>>> origin/main
         $stmt->execute([$username]);
         $user = $stmt->fetch();
 
@@ -29,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user'] = $user;
             $_SESSION['terms_accepted'] = true;
             $_SESSION['terms_version'] = '1.0';
+<<<<<<< HEAD
             $pdo->prepare('UPDATE users SET last_login = NOW() WHERE id = ?')->execute([(int)$user['id']]);
             try { $pdo->prepare('INSERT INTO activity_logs (user_id, action, module, record_id, description, created_at) VALUES (?,?,?,?,?,NOW())')->execute([(int)$user['id'], 'Sign In', 'Authentication', null, 'User signed in']); } catch (Throwable $e) {}
 
@@ -36,6 +41,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: system_admin.php');
             } elseif ($user['role'] === 'Sales Admin') {
                 header('Location: admin_customers.php');
+=======
+            $pdo->prepare('UPDATE users SET last_login = NOW() WHERE user_id = ?')->execute([(int)$user['id']]);
+            try { $pdo->prepare('INSERT INTO activity_logs (user_id, action, module, record_id, description, created_at) VALUES (?,?,?,?,?,NOW())')->execute([(int)$user['id'], 'Sign In', 'Authentication', null, 'User signed in']); } catch (Throwable $e) {}
+
+            if ($user['role'] === 'Sales Admin') {
+                header('Location: admin_customers.php');
+            } elseif ($user['role'] === 'Customer') {
+                header('Location: customer_portal.php');
+>>>>>>> origin/main
             } else {
                 header('Location: dashboard.php');
             }

@@ -14,9 +14,13 @@ $coreModules = [
 ];
 $billingModules = [
     'invoices.php' => ['label' => 'Sales Invoice', 'icon' => '▥'],
+<<<<<<< HEAD
     'receivables.php' => ['label' => 'Accounts Receivable', 'icon' => '◷'],
     'collection.php' => ['label' => 'Collection', 'icon' => '▤'],
     'balance.php' => ['label' => 'Customer Balance', 'icon' => '₱'],
+=======
+    'customer_account.php' => ['label' => 'Billing & Finance', 'icon' => '◷'],
+>>>>>>> origin/main
 ];
 $activeModuleSection = array_key_exists($currentPage, $billingModules)
     ? 'billing'
@@ -25,6 +29,14 @@ $initial = strtoupper(substr($user['name'] ?? 'S', 0, 1));
 $avatarPath = trim((string)($user['avatar_path'] ?? ''));
 $avatarSrc = $avatarPath !== '' ? $avatarPath : '';
 $isSalesAdmin = ($user['role'] ?? '') === 'Sales Admin';
+<<<<<<< HEAD
+=======
+$isCustomer = ($user['role'] ?? '') === 'Customer';
+if ($isCustomer && $currentPage !== 'customer_portal.php') {
+    header('Location: customer_portal.php');
+    exit;
+}
+>>>>>>> origin/main
 $isSystemAdmin = in_array(($user['role'] ?? ''), ['System Admin','Administrator'], true);
 ?>
 <!DOCTYPE html>
@@ -40,6 +52,7 @@ $isSystemAdmin = in_array(($user['role'] ?? ''), ['System Admin','Administrator'
     <link rel="icon" href="assets/img/logo.png">
 </head>
 <body>
+<<<<<<< HEAD
 <div class="app-shell">
     <?php include __DIR__ . '/sidebar.php'; ?>
     <main class="main-content">
@@ -47,6 +60,15 @@ $isSystemAdmin = in_array(($user['role'] ?? ''), ['System Admin','Administrator'
             <button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
             <div class="banner">
                 <p class="eyebrow"><?= $isSystemAdmin ? 'SYSTEM ADMIN' : ($isSalesAdmin ? 'SALES ADMIN' : 'SALES DEPARTMENT') ?></p>
+=======
+<div class="app-shell <?= $isCustomer ? 'customer-shell' : '' ?>">
+    <?php include __DIR__ . '/sidebar.php'; ?>
+    <main class="main-content <?= $isCustomer ? 'customer-main' : '' ?>">
+        <header class="topbar">
+            <button class="mobile-menu" id="mobileMenu" aria-label="Open navigation">☰</button>
+            <div class="banner">
+                <p class="eyebrow"><?= $isSystemAdmin ? 'SYSTEM ADMIN' : ($isSalesAdmin ? 'SALES ADMIN' : ($isCustomer ? 'CUSTOMER PORTAL' : 'SALES DEPARTMENT')) ?></p>
+>>>>>>> origin/main
                 <h1><?= htmlspecialchars($pageTitle) ?></h1>
             </div>
 
@@ -91,7 +113,11 @@ $isSystemAdmin = in_array(($user['role'] ?? ''), ['System Admin','Administrator'
             </div>
         </header>
 
+<<<<<<< HEAD
 <?php if (!$isSalesAdmin && !$isSystemAdmin && $currentPage !== 'dashboard.php' && $currentPage !== 'customers.php' && $currentPage !== 'reports.php' && !in_array($currentPage, ['manage_profile.php','account_settings.php','help_center.php'], true)): ?>
+=======
+<?php if (!$isCustomer && !$isSalesAdmin && !$isSystemAdmin && $currentPage !== 'dashboard.php' && $currentPage !== 'customers.php' && $currentPage !== 'reports.php' && $currentPage !== 'inventory.php' && !in_array($currentPage, ['manage_profile.php','account_settings.php','help_center.php'], true)): ?>
+>>>>>>> origin/main
 <nav class="module-switcher" id="moduleSwitcher">
     <?php $modulesToShow = $activeModuleSection === 'billing' ? $billingModules : $coreModules; ?>
     <div class="module-links">

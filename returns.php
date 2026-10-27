@@ -27,8 +27,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageTitle = 'Sales Returns';
 include __DIR__ . '/includes/header.php';
 
+<<<<<<< HEAD
 $search=trim($_GET['search']??''); $sql='SELECT r.*, o.order_no, c.customer_name AS customer_name FROM sales_returns r JOIN sales_orders o ON o.id=r.order_id JOIN customers c ON c.id=o.customer_id'; $params=[]; if($search!==''){ $sql.=' WHERE r.return_no LIKE ? OR o.order_no LIKE ? OR c.customer_name LIKE ? OR r.reason LIKE ? OR r.status LIKE ?'; $like='%'.$search.'%'; $params=[$like,$like,$like,$like,$like]; } $sql.=' ORDER BY r.id DESC'; $st=$pdo->prepare($sql); $st->execute($params); $rows=$st->fetchAll();
 $orders = $pdo->query('SELECT o.id, o.order_no, c.customer_name AS customer_name FROM sales_orders o JOIN customers c ON c.id = o.customer_id ORDER BY o.id DESC')->fetchAll();
+=======
+$search=trim($_GET['search']??''); $sql='SELECT r.*, o.order_no, c.customer_name AS customer_name FROM sales_returns r JOIN sales_orders o ON o.so_id=r.order_id JOIN customers c ON c.cus_id=o.customer_id'; $params=[]; if($search!==''){ $sql.=' WHERE r.return_no LIKE ? OR o.order_no LIKE ? OR c.customer_name LIKE ? OR r.reason LIKE ? OR r.status LIKE ?'; $like='%'.$search.'%'; $params=[$like,$like,$like,$like,$like]; } $sql.=' ORDER BY r.ret_id DESC'; $st=$pdo->prepare($sql); $st->execute($params); $rows=$st->fetchAll();
+$orders = $pdo->query('SELECT o.so_id, o.order_no, c.customer_name AS customer_name FROM sales_orders o JOIN customers c ON c.cus_id = o.customer_id ORDER BY o.so_id DESC')->fetchAll();
+>>>>>>> origin/main
 ?>
 <div class="page-toolbar"><p class="muted" style="color: white;">Record and review products returned after a sale.</p><button class="primary-btn" data-open-modal="addReturnModal">+ New Sales Return</button></div>
 <div class="module-search"><form method="GET"><input type="hidden" name="section" value="core"><input type="search" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search returns, orders, customers, reason, or status..."><button class="secondary-btn" type="submit">Search</button><?php if($search!==''): ?><a class="text-link" href="returns.php?section=core">Clear</a><?php endif; ?></form></div>
@@ -59,7 +64,11 @@ $orders = $pdo->query('SELECT o.id, o.order_no, c.customer_name AS customer_name
             <label>Sales Order
                 <select name="order_id" required>
                     <option value="">Select order</option>
+<<<<<<< HEAD
                     <?php foreach ($orders as $o): ?><option value="<?= $o['id'] ?>"><?= htmlspecialchars($o['order_no']) ?> — <?= htmlspecialchars($o['customer_name']) ?></option><?php endforeach; ?>
+=======
+                    <?php foreach ($orders as $o): ?><option value="<?= $o['so_id'] ?>"><?= htmlspecialchars($o['order_no']) ?> — <?= htmlspecialchars($o['customer_name']) ?></option><?php endforeach; ?>
+>>>>>>> origin/main
                 </select>
             </label>
             <label>Reason

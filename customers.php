@@ -1,4 +1,5 @@
 <?php
+<<<<<<< HEAD
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
@@ -89,3 +90,17 @@ $customers = $pdo->query('SELECT * FROM customers ORDER BY id DESC')->fetchAll()
 </div>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
+=======
+require_once __DIR__ . '/includes/auth.php';
+
+requireLogin();
+
+if (currentUser()['role'] === 'Sales Admin') {
+    header('Location: admin_customers.php');
+    exit;
+}
+
+header('Location: dashboard.php');
+exit;
+?>
+>>>>>>> origin/main
