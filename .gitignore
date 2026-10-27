@@ -3,3 +3,5 @@ config/inventory_db.php
 assets/uploads/avatars/*
 assets/uploads/products/*
 !assets/uploads/products/.gitkeep
+
+config/database.php
