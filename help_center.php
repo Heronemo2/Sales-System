@@ -5,8 +5,8 @@ include __DIR__ . '/includes/header.php';
 <section class="settings-page">
     <div class="page-intro">
         <p class="eyebrow">SUPPORT</p>
-        <h2 style="color: white;">Help Center</h2>
-        <p style="color: white;">Quick answers for using the Team Sales Management System.</p>
+        <h2>Help Center</h2>
+        <p>Quick answers for using the Team Sales Management System.</p>
     </div>
 
     <div class="help-grid">

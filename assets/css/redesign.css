@@ -24,7 +24,8 @@ body{background:var(--ui-bg)!important;color:var(--ui-ink)!important;font-family
 .sidebar{width:248px!important;background:linear-gradient(180deg,var(--ui-sidebar),#0d1522)!important;color:#dbe4f0!important;border:0!important;padding:18px 14px!important;box-shadow:10px 0 30px rgba(15,23,42,.08)!important}
 .brand{padding:8px 9px 22px!important;border-bottom:1px solid rgba(255,255,255,.08)!important;margin-bottom:12px!important;gap:11px!important}
 .brand-logo,.brand-logo img{width:42px!important;height:42px!important}
-.brand-logo{border-radius:12px;background:#fff;padding:4px;box-shadow:0 5px 18px rgba(0,0,0,.15)}
+.brand-logo{display:grid!important;place-items:center!important;border-radius:0!important;background:transparent!important;padding:0!important;box-shadow:none!important}
+.brand-logo img{display:block!important;width:100%!important;height:100%!important;object-fit:contain!important}
 .brand-text strong{color:#fff!important;font-size:14px!important;letter-spacing:.8px!important}
 .brand-text span{color:#91a2b9!important;font-size:10px!important;margin-top:4px}
 .nav-menu{padding:0 2px}
@@ -101,7 +102,7 @@ label{color:#475569!important;font-size:11px!important;font-weight:600}
 .login-panel{width:min(470px,100%)!important}
 .login-brand{display:flex!important;align-items:center!important;gap:12px!important;margin-bottom:52px!important}
 .login-brand strong{font-size:15px!important;color:#172033!important}.login-brand span{color:#64748b!important;font-size:11px!important}
-.login-brand .brand-logo{background:#eff6ff!important;border:1px solid #dbeafe!important}
+.login-brand .brand-logo{background:transparent!important;border:0!important;box-shadow:none!important}
 .login-heading .eyebrow{color:var(--ui-primary)!important;font-size:9px!important}.login-heading h1{font:700 32px/1.1 Inter,ui-sans-serif,system-ui!important;color:#111827!important;letter-spacing:-.7px!important}.login-heading p{color:#64748b!important;font-size:12px!important;line-height:1.7}
 .login-form label{margin-top:16px!important}.login-form input{height:44px!important;padding:0 13px!important;margin-top:7px!important}
 .login-form .primary-btn{height:44px!important;margin-top:20px!important}
@@ -139,7 +140,7 @@ body{color:#1f2937!important}
 /* Red navigation */
 .sidebar{background:linear-gradient(180deg,#780000 0%,#980b0b 55%,#680000 100%)!important;box-shadow:8px 0 25px rgba(127,0,0,.18)!important}
 .brand{border-bottom-color:rgba(255,255,255,.16)!important}
-.brand-logo{background:#fff!important}
+.brand-logo{background:transparent!important}
 .brand-text span{color:#fecaca!important}
 .nav-label{color:#fca5a5!important}
 .nav-menu a,.nav-menu button{color:#fee2e2!important}
@@ -178,6 +179,22 @@ input:focus,select:focus,textarea:focus,.form-grid input:focus,.form-grid select
 .status.pending,.status.rejected,.status.cancelled{background:#fee2e2!important;color:#b91c1c!important}
 
 /* Login */
-.login-page{background:#e5e7eb!important}
+.login-page.login-split-page{width:100%;min-height:100vh;margin:0;padding:0!important;background:#7f0000!important}
+.login-page.login-split-page .login-split{width:100%;min-height:100vh;margin:0;max-width:none!important;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr)!important}
 .login-left{background:linear-gradient(145deg,#7f0000,#b91c1c)!important}
-.login-right{background:#e5e7eb!important}
+.login-right{background:linear-gradient(145deg,#172033,#26364f 58%,#7f1d1d)!important}
+.login-page.login-split-page .login-left{color:#fff!important}
+.login-page.login-split-page .login-brand{flex-direction:column!important;justify-content:center!important;align-items:center!important;text-align:center!important;gap:10px!important}
+.login-page.login-split-page .login-brand .brand-logo{display:grid!important;place-items:center!important;width:64px!important;height:64px!important;margin:0 auto!important;padding:0!important;overflow:visible!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+.login-page.login-split-page .login-brand .brand-logo img{display:block!important;width:100%!important;height:100%!important;object-fit:contain!important}
+.login-page.login-split-page .login-brand strong{color:#fff!important}
+.login-page.login-split-page .login-brand span{color:#fee2e2!important}
+.login-page.login-split-page .login-heading .eyebrow{color:#fecaca!important}
+.login-page.login-split-page .login-heading h1{color:#fff!important}
+.login-page.login-split-page .login-heading p{color:#fee2e2!important}
+.login-page.login-split-page .login-form>label{color:#fff!important}
+.login-page.login-split-page .login-terms{background:#fff!important;color:#334155!important}
+.login-page.login-split-page .login-terms>div:first-child{color:#172033!important}
+.login-page.login-split-page .login-terms p{color:#334155!important}
+.login-page.login-split-page .terms-agree{color:#334155!important}
+@media(max-width:1050px){.login-page.login-split-page .login-split{grid-template-columns:1fr!important}.login-page.login-split-page .login-right{display:none!important}}

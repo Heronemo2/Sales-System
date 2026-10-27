@@ -35,8 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <section class="settings-page">
     <div class="page-intro">
         <p class="eyebrow">ACCOUNT</p>
-        <h2 style="color: white;">Account Settings</h2>
-        <p style="color: white;">Manage your password and basic account preferences.</p>
+        <h2>Account Settings</h2>
+        <p>Manage your password and basic account preferences.</p>
     </div>
 
     <?php if ($success): ?><div class="alert success"><?= htmlspecialchars($success) ?></div><?php endif; ?>

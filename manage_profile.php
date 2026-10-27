@@ -23,8 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
                     throw new RuntimeException('The profile photo could not be uploaded.');
                 }
-                if ($_FILES['avatar']['size'] > 2 * 1024 * 1024) {
-                    throw new RuntimeException('Profile photo must be 2 MB or smaller.');
+                if ($_FILES['avatar']['size'] > 10 * 1024 * 1024) {
+                    throw new RuntimeException('Profile photo must be 10 MB or smaller.');
                 }
                 $finfo = new finfo(FILEINFO_MIME_TYPE);
                 $mime = $finfo->file($_FILES['avatar']['tmp_name']);
@@ -50,8 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $stmt = $pdo->prepare('UPDATE users SET full_name= ?, username = ?, avatar_path = ? WHERE user_id = ?');
-            $stmt->execute([$full_name, $username, $avatarPath !== '' ? $avatarPath : null, $user['id'] ?? 0]);
-            $_SESSION['user']['full_name'] = $full_name;
+            $stmt->execute([$name, $username, $avatarPath !== '' ? $avatarPath : null, $user['id'] ?? 0]);
+            $_SESSION['user']['name'] = $name;
+            $_SESSION['user']['full_name'] = $name;
             $_SESSION['user']['username'] = $username;
             $_SESSION['user']['avatar_path'] = $avatarPath;
             $user = currentUser();
@@ -68,8 +69,8 @@ include __DIR__ . '/includes/header.php';
 <section class="settings-page">
     <div class="page-intro">
         <p class="eyebrow">ACCOUNT</p>
-        <h2 style="color: white;">Manage Profile</h2>
-        <p style="color: white;">Keep your personal account information up to date.</p>
+        <h2>Manage Profile</h2>
+        <p>Keep your personal account information up to date.</p>
     </div>
 
     <?php if ($success): ?><div class="alert success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
