@@ -528,7 +528,7 @@ INSERT INTO `sales_returns` (`ret_id`, `return_no`, `order_id`, `return_date`, `
 --
 
 CREATE TABLE `users` (
-  `user_id` int(10) UNSIGNED NOT NULL,
+  `user_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
   `full_name` varchar(120) NOT NULL,
   `username` varchar(60) NOT NULL,
   `password` varchar(255) NOT NULL,
@@ -538,8 +538,12 @@ CREATE TABLE `users` (
   `avatar_path` varchar(255) DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `uq_users_customer_id` (`customer_id`),
+  CONSTRAINT `users_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`cus_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `users`
@@ -673,13 +677,6 @@ ALTER TABLE `sales_returns`
   ADD KEY `order_id` (`order_id`);
 
 --
--- Indexes for table `users`
---
-ALTER TABLE `users`
-  ADD PRIMARY KEY (`user_id`),
-  ADD UNIQUE KEY `username` (`username`),
-  ADD UNIQUE KEY `uq_users_customer_id` (`customer_id`);
-
 --
 -- AUTO_INCREMENT for dumped tables
 --
@@ -769,11 +766,6 @@ ALTER TABLE `sales_returns`
   MODIFY `ret_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
--- AUTO_INCREMENT for table `users`
---
-ALTER TABLE `users`
-  MODIFY `user_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
-
 --
 -- Constraints for dumped tables
 --
@@ -841,11 +833,6 @@ ALTER TABLE `sales_quotations`
 ALTER TABLE `sales_returns`
   ADD CONSTRAINT `sales_returns_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `sales_orders` (`so_id`);
 
---
--- Constraints for table `users`
---
-ALTER TABLE `users`
-  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`cus_id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
