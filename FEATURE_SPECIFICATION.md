@@ -122,10 +122,10 @@ This specification describes functionality visible in the current repository. It
 
 - **Purpose:** Check product availability and reflect stock transferred from the Inventory System to Team Sales.
 - **Actors:** Sales Staff and Sales Admin; the Inventory System owns product and stockout approval.
-- **Behavior:** Query Inventory product/stock details; expose a Sales-side availability endpoint for the order-entry UI; synchronize Inventory stockout records; show Team Sales stock and stockout statuses.
+- **Behavior:** Use Inventory product details when evaluating quotation stock; synchronize Inventory stockout records; show Team Sales stock and stockout statuses.
 - **Rules:** Inventory is the authoritative source for product master data and stockout approval. Sales does not approve an Inventory stockout. Team Sales stock is tracked separately and is added after an approved Inventory stockout is synchronized.
-- **Acceptance criteria:** A valid product lookup returns current product/availability data; integration errors are surfaced; a synchronized stockout is visible with its status and reference.
-- **Implementation/data:** [inventory.php](./inventory.php), [inventory_stockout_approval.php](./inventory_stockout_approval.php), [check_availability.php](./api/check_availability.php), [inventory_db.php](./config/inventory_db.php), `inventory`, `inventory_stockout_approvals`.
+- **Acceptance criteria:** Quotation stock checks use current Inventory product details and Team Sales stock; a synchronized stockout is visible with its status and reference.
+- **Implementation/data:** [inventory.php](./inventory.php), [inventory_stockout_approval.php](./inventory_stockout_approval.php), [functions.php](./includes/functions.php), [inventory_db.php](./config/inventory_db.php), `inventory`, `inventory_stockout_approvals`.
 
 ### 4.10 Delivery tracking
 

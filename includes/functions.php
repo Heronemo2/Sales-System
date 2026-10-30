@@ -1097,7 +1097,4 @@ function convertOrderToDelivery(PDO $pdo, int $orderId): string
         throw $e;
     }
 }
-
-
-
 ?>
