@@ -31,15 +31,16 @@ $isCustomer = $userRole === 'Customer';
                 <a class="section-nav <?= $activeSection === 'core' ? 'active' : '' ?>" href="quotations.php?section=core"><span class="nav-icon">C</span><span>Core Sales & Order Management</span><span class="section-arrow">›</span></a>
                 <div class="nav-label">INVENTORY</div>
                 <a class="section-nav <?= $current === 'inventory.php' ? 'active' : '' ?>" href="inventory.php"><span class="nav-icon">I</span><span>Inventory</span><span class="section-arrow">›</span></a>
-                <a class="section-nav <?= $current === 'inventory_stockout_approval.php' ? 'active' : '' ?>" href="inventory_stockout_approval.php"><span class="nav-icon">✓</span><span>Inventory Stockout Approval</span><span class="section-arrow">›</span></a>
                 <div class="nav-label">BILLING</div>
-                <a class="section-nav <?= $activeSection === 'billing' ? 'active' : '' ?>" href="customer_account.php?section=billing"><span class="nav-icon">B</span><span>Billing & Financial Accounting</span><span class="section-arrow">›</span></a>
+                <a class="section-nav <?= $activeSection === 'billing' ? 'active' : '' ?>" href="customer_account.php?section=payment"><span class="nav-icon">B</span><span>Payment</span><span class="section-arrow">›</span></a>
                 <div class="nav-label">REPORTS</div>
                 <a class="section-nav <?= $activeSection === 'sales' ? 'active' : '' ?>" href="reports.php?section=sales"><span class="nav-icon">S</span><span>Sales Report</span><span class="section-arrow">›</span></a>
             <?php elseif ($isSalesAdmin): ?>
                 <div class="nav-label">ADMINISTRATION</div>
                 <a class="section-nav <?= $current === 'admin_customers.php' ? 'active' : '' ?>" href="admin_customers.php"><span class="nav-icon">C</span><span>Customer Management</span><span class="section-arrow">›</span></a>
-                <a class="section-nav <?= $current === 'admin_approvals.php' ? 'active' : '' ?>" href="admin_approvals.php"><span class="nav-icon">✓</span><span>Sales Approvals</span><span class="section-arrow">›</span></a>
+                <a class="section-nav <?= $current === 'sales_quotation_approval.php' ? 'active' : '' ?>" href="sales_quotation_approval.php"><span class="nav-icon">Q</span><span>Sales Quotation Approval</span><span class="section-arrow">›</span></a>
+                <a class="section-nav <?= $current === 'sales_order_approval.php' ? 'active' : '' ?>" href="sales_order_approval.php"><span class="nav-icon">O</span><span>Sales Order Approval</span><span class="section-arrow">›</span></a>
+                <a class="section-nav <?= $current === 'sales_return_approval.php' ? 'active' : '' ?>" href="sales_return_approval.php"><span class="nav-icon">R</span><span>Sales Return Approval</span><span class="section-arrow">›</span></a>
                 <a class="section-nav <?= $current === 'inventory_stockout_approval.php' ? 'active' : '' ?>" href="inventory_stockout_approval.php"><span class="nav-icon">I</span><span>Inventory Stockout Status</span><span class="section-arrow">›</span></a>
             <?php endif; ?>
         </nav>

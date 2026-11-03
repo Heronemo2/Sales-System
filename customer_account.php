@@ -10,6 +10,8 @@ $pdo = getDB();
 $pageTitle = 'Billing & Finance';
 $error = '';
 $notice = '';
+$section = $_GET['section'] ?? 'billing';
+$section = in_array($section, ['billing', 'payment'], true) ? $section : 'billing';
 
 /* =========================================================
    RECORD COLLECTION FROM THE SAME BILLING RECEIPT
@@ -19,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'recor
     $collectionDate = $_POST['collection_date'] ?? '';
     $dueDate = $_POST['due_date'] ?? '';
     $amount = (float)($_POST['amount'] ?? 0);
-    $allowedMethods = ['Cash', 'GCash', 'Bank Transfer'];
+    $allowedMethods = supportedPaymentMethods();
     $method = in_array($_POST['method'] ?? '', $allowedMethods, true) ? $_POST['method'] : 'Cash';
 
     if (!$invoiceId || !$collectionDate || !$dueDate || $amount <= 0) {
@@ -174,10 +176,12 @@ include __DIR__ . '/includes/header.php'; ?>
     <div class="billing-hero">
         <div>
             <p class="eyebrow light">BILLING / FINANCE</p>
-            <h2>Billing & Finance</h2>
+            <h2>Payment</h2>
             <p>Accounts Receivable and Collection are kept together on one billing receipt.</p>
         </div>
-        <a class="secondary-btn" href="invoices.php?section=billing">Open Sales Invoices</a>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <a class="secondary-btn" href="invoices.php?section=billing">Open Sales Invoices</a>
+        </div>
     </div>
 
     <?php if ($notice): ?>
@@ -323,5 +327,4 @@ include __DIR__ . '/includes/header.php'; ?>
     </script>
 
 </div>
-
 <?php include __DIR__ . '/includes/footer.php'; ?>

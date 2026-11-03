@@ -74,8 +74,7 @@ $rows = $st->fetchAll();
                             <?php elseif (!empty($r['invoice_no'])): ?>
                                 <small>Invoiced: <?= htmlspecialchars($r['invoice_no']) ?></small>
                             <?php else: ?>
-                                <small>Delivery <?= htmlspecialchars($r['delivery_no'] ?? '—') ?></small><br>
-                                <a class="table-action" href="invoices.php?section=billing&order_id=<?= (int)$r['so_id'] ?>">Create Invoice</a>
+                                <small>Delivery <?= htmlspecialchars($r['delivery_no'] ?? '—') ?></small>
                             <?php endif; ?>
                         </td>
                     </tr>

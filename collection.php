@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $date = $_POST['collection_date'] ?? '';
     $dueDate = $_POST['due_date'] ?? '';
     $amount = (float) ($_POST['amount'] ?? 0);
-    $method = in_array($_POST['method'] ?? '', ['Cash', 'GCash', 'Bank Transfer'], true) ? $_POST['method'] : 'Cash';
+    $method = in_array($_POST['method'] ?? '', supportedPaymentMethods(), true) ? $_POST['method'] : 'Cash';
 
     if (!$invoiceId || !$date || !$dueDate || $amount <= 0) {
         $error = 'Invoice, collection date, due date, and an amount greater than 0 are required.';

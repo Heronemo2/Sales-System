@@ -30,7 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $orderNo = nextDocNo($pdo, 'sales_orders', 'SO-', 1000);
             $pay = $pdo->prepare("SELECT payment_method,payment_status,payment_reference,paid_at,receipt_no FROM sales_quotations WHERE sq_id=?");
             $pay->execute([$po['quotation_id']]);
-            $payment = $pay->fetch() ?: ['payment_method' => 'Cash on Delivery', 'payment_status' => 'Pending', 'payment_reference' => null, 'paid_at' => null, 'receipt_no' => null];
+            $payment = $pay->fetch() ?: ['payment_method' => 'Cash', 'payment_status' => 'Pending', 'payment_reference' => null, 'paid_at' => null, 'receipt_no' => null];
+            if (($payment['payment_method'] ?? '') === 'Cash on Delivery') {
+                $payment['payment_method'] = 'Cash';
+            }
             $pdo->beginTransaction();
             try {
                 $pdo->prepare("INSERT INTO sales_orders

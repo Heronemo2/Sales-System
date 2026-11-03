@@ -366,8 +366,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     );
                 }
 
+                $pdo->prepare("UPDATE sales_orders SET admin_status = 'Approved' WHERE so_id = ? AND admin_status = 'Pending'")->execute([$id]);
                 $delivery = convertOrderToDelivery($pdo, $id);
-                $notice = "Sales Order approved and converted to Delivery {$delivery}.";
+                $invoiceNo = ensureSalesInvoiceForOrder($pdo, $id);
+                $notice = $invoiceNo
+                    ? "Sales Order approved and invoice {$invoiceNo} was generated automatically; Delivery {$delivery} was created."
+                    : "Sales Order approved and converted to Delivery {$delivery}.";
 
             } else {
 

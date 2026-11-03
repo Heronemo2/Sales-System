@@ -16,7 +16,6 @@ $coreModules = [
     'purchase_orders.php' => ['label' => 'Purchase Order', 'icon' => '▣'],
     'orders.php' => ['label' => 'Sales Order', 'icon' => '▣'],
     'delivery.php' => ['label' => 'Delivery', 'icon' => '▱'],
-    'returns.php' => ['label' => 'Sales Return', 'icon' => '↩'],
 ];
 $billingModules = [
     'customer_account.php' => ['label' => 'Billing & Finance', 'icon' => '◷'],

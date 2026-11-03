@@ -58,6 +58,44 @@ function nextDocNo(PDO $pdo, string $table, string $prefix, int $base = 0, int $
     return $docNo;
 }
 
+function supportedPaymentMethods(): array {
+    return ['Cash', 'GCash', 'Bank Transfer'];
+}
+
+function ensureSalesInvoiceForOrder(PDO $pdo, int $orderId): ?string
+{
+    if ($orderId <= 0) {
+        return null;
+    }
+
+    $check = $pdo->prepare("SELECT * FROM sales_orders WHERE so_id = ? LIMIT 1");
+    $check->execute([$orderId]);
+    $order = $check->fetch(PDO::FETCH_ASSOC);
+
+    if (!$order) {
+        return null;
+    }
+
+    $existing = $pdo->prepare("SELECT invoice_no FROM sales_invoices WHERE order_id = ? LIMIT 1");
+    $existing->execute([$orderId]);
+    $invoiceNo = $existing->fetchColumn();
+    if ($invoiceNo) {
+        return (string) $invoiceNo;
+    }
+
+    $invoiceNo = nextDocNo($pdo, 'sales_invoices', 'INV-', 3000);
+    $paid = ((float)($order['total_amount'] ?? 0)) > 0 && (($order['payment_status'] ?? 'Pending') === 'Paid') ? (float)($order['total_amount'] ?? 0) : 0.0;
+    $status = $paid > 0 ? 'Paid' : 'Unpaid';
+
+    $insert = $pdo->prepare("INSERT INTO sales_invoices (invoice_no, order_id, invoice_date, total_amount, amount_paid, status) VALUES (?, ?, CURDATE(), ?, ?, ?)");
+    $insert->execute([$invoiceNo, $orderId, (float)($order['total_amount'] ?? 0), $paid, $status]);
+
+    $pdo->prepare("UPDATE sales_orders SET status = 'Invoiced', admin_status = 'Approved' WHERE so_id = ? AND status <> 'Cancelled'")->execute([$orderId]);
+    syncSalesOrderCompletion($pdo, $orderId);
+
+    return $invoiceNo;
+}
+
 /**
  * Synchronize a Sales Order with its invoice and delivery status.
  * Completed means the order is BOTH fully paid AND delivered.
