@@ -31,9 +31,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'order')
                     $requestResult = createTeamSalesStockoutRequest($pdo, (string)($orderRow['product_code'] ?? ''), $missing, (string)($orderRow['order_no'] ?? 'Sales Order'));
                     throw new RuntimeException(($requestResult['message'] ?? 'Inventory stock-out request sent.') . ' The Sales Order remains pending until the stock-out is approved in Team Sales.');
                 }
-
-                $update = $pdo->prepare("UPDATE sales_orders SET admin_status = 'Approved' WHERE so_id = ? AND admin_status = 'Pending'");
-                $update->execute([$id]);
                 $delivery = convertOrderToDelivery($pdo, $id);
                 $invoiceNo = ensureSalesInvoiceForOrder($pdo, $id);
                 $notice = $invoiceNo ? "Order approved, invoice {$invoiceNo} was generated automatically, and delivery {$delivery} was created." : "Order approved and converted to Delivery {$delivery}.";

@@ -78,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $enoughCurrentStock =
                     $localStock &&
+                    ($required > 0) &&
                     ($available >= $required) &&
                     (($localStock['status'] ?? 'Active') === 'Active');
 
@@ -184,6 +185,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException(
                     'The requested quantity must be at least ' . rtrim(rtrim(number_format($missing, 2, '.', ''), '0'), '.') . '.'
                 );
+            }
+
+            $existingRequestStmt = $pdo->prepare("
+                SELECT request_status
+                FROM inventory_stockout_approvals
+                WHERE source_reference = ?
+                ORDER BY id DESC
+                LIMIT 1
+            ");
+            $existingRequestStmt->execute([(string)$quotation['quotation_no']]);
+            $existingRequestStatus = $existingRequestStmt->fetchColumn();
+            if ($existingRequestStatus === 'Requested') {
+                throw new RuntimeException('A stock request for this quotation is already waiting for the Inventory System.');
+            }
+            if ($existingRequestStatus === 'Stocked Out') {
+                throw new RuntimeException('Inventory has stocked out the requested items. Approve the stock-out in Team Sales before requesting more.');
             }
 
             if ($reference === '') {
@@ -365,8 +382,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ' The Sales Order remains pending until the stock-out is approved in Team Sales.'
                     );
                 }
-
-                $pdo->prepare("UPDATE sales_orders SET admin_status = 'Approved' WHERE so_id = ? AND admin_status = 'Pending'")->execute([$id]);
                 $delivery = convertOrderToDelivery($pdo, $id);
                 $invoiceNo = ensureSalesInvoiceForOrder($pdo, $id);
                 $notice = $invoiceNo
@@ -476,6 +491,7 @@ foreach ($quotations as &$q) {
 
     $q['enough_stock'] =
         $localStock &&
+        ($required > 0) &&
         ($q['live_inventory_quantity'] >= $required) &&
         $q['live_inventory_status'] === 'Active';
 
@@ -507,8 +523,6 @@ $orders = $pdo->query("
     WHERE o.admin_status = 'Pending'
     ORDER BY o.so_id DESC
 ")->fetchAll();
-
-
 $returns = $pdo->query("
     SELECT
         r.*,
@@ -746,7 +760,7 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
                     </a>
 
 
-                    <?php if (!$q['enough_stock'] && $requestStatus !== 'Approved'): ?>
+                    <?php if (!$q['enough_stock']): ?>
 
                         <?php if ($requestStatus === 'Requested'): ?>
 
@@ -886,7 +900,6 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
                         <span>Total</span>
                         <b><?= peso((float)$o['total_amount']) ?></b>
                     </div>
-
                 </div>
 
                 <div class="approval-card-actions">
