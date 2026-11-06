@@ -38,7 +38,6 @@ include __DIR__ . '/includes/header.php';
                     This is the stock currently held by Team Sales. Stock is added only after an Inventory System stock-out is approved here.
                 </p>
             </div>
-            <a class="primary-btn" href="inventory_stockout_approval.php">Stockout Approval</a>
         </div>
 
         <div class="table-wrap">

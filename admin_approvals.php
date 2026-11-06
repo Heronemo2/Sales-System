@@ -248,18 +248,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($type === 'specific_stock_request') {
 
             $productCode = trim($_POST['product_code'] ?? '');
+            $selectedSize = (string)($_POST['size'] ?? '');
+            $size = $selectedSize === '__no_size__' ? '' : $selectedSize;
             $quantity = (float)($_POST['quantity'] ?? 0);
             $remarks = trim($_POST['remarks'] ?? '');
 
-            if ($productCode === '' || $quantity <= 0) {
-                throw new RuntimeException('Select a product and enter a valid quantity.');
+            if ($productCode === '' || $selectedSize === '' || $quantity <= 0) {
+                throw new RuntimeException('Select a finished good and size, then enter a valid quantity.');
             }
 
             $result = createTeamSalesStockoutRequest(
                 $pdo,
                 $productCode,
                 $quantity,
-                $remarks !== '' ? $remarks : 'Specific stock request from Sales Approval'
+                $remarks !== '' ? $remarks : 'Specific stock request from Sales Approval',
+                $size
             );
 
             $notice = ($result['message'] ?? 'Stock request sent to Inventory System.')
@@ -543,12 +546,16 @@ try {
     require_once __DIR__ . '/config/inventory_db.php';
     $inventoryDb = getInventoryDB();
     $stockRequestProducts = $inventoryDb->query("
-        SELECT item_code, item_name, size, unit
-        FROM items
-        WHERE status = 'Active'
-          AND item_code IS NOT NULL
-          AND item_code <> ''
-        ORDER BY item_name ASC, size ASC, item_code ASC
+        SELECT DISTINCT i.item_code, i.item_name, i.size, i.unit
+        FROM items i
+        INNER JOIN finished_goods fg
+            ON fg.item_code = i.item_code
+        WHERE i.item_type = 'Finished Good'
+          AND i.status = 'Active'
+          AND fg.status = 'Active'
+          AND i.item_code IS NOT NULL
+          AND i.item_code <> ''
+        ORDER BY i.item_name ASC, i.size ASC, i.item_code ASC
     ")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
     if ($error === '') {
@@ -1027,7 +1034,7 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
         <div class="stock-request-dialog-head">
             <div>
                 <p class="eyebrow dark" style="margin-bottom:6px;">INVENTORY REQUEST</p>
-                <h2 id="specificStockRequestTitle" style="margin:0;">Request Specific Product</h2>
+                <h2 id="specificStockRequestTitle" style="margin:0;">Request Finished Goods from Inventory</h2>
                 <p class="muted" style="margin:6px 0 0;">Inventory System will approve or decline this request.</p>
             </div>
             <button type="button" class="stock-request-close" onclick="closeSpecificStockRequestModal()" aria-label="Close">&times;</button>
@@ -1266,8 +1273,8 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStockRe
       const matches=productSizes.filter(function(p){return String(p.item_code)===String(code);});
       matches.forEach(function(p){
         const opt=document.createElement('option');
-        opt.value=p.size || '—';
-        opt.textContent=(p.size || '—') + (p.unit ? ' · '+p.unit : '');
+        opt.value=p.size || '__no_size__';
+        opt.textContent=(p.size || 'Standard / no size') + (p.unit ? ' · '+p.unit : '');
         sizeSelect.appendChild(opt);
       });
       sizeSelect.disabled=matches.length===0;

@@ -152,7 +152,7 @@ function syncSalesOrderCompletion(PDO $pdo, int $orderId): void
 function badgeClass(string $status): string {
     $status = strtolower($status);
     return match (true) {
-        in_array($status, ['active', 'approved', 'completed', 'delivered', 'paid', 'current'], true) => 'success',
+        in_array($status, ['active', 'approved', 'inventory approved', 'completed', 'delivered', 'paid', 'current'], true) => 'success',
         in_array($status, ['pending', 'processing', 'partially paid', 'preparing', 'in transit'], true) => 'warning',
         in_array($status, ['rejected', 'cancelled', 'overdue', 'unpaid'], true) => 'danger',
         in_array($status, ['invoiced'], true) => 'info',
@@ -660,7 +660,7 @@ function createPurchaseOrderFromQuotation(PDO $pdo, int $quotationId): ?string {
  * Team Sales never changes Inventory stock. Inventory's own Admin
  * approves the request and the Inventory System creates the stock_out.
  */
-function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float $quantity, string $reference = ''): array
+function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float $quantity, string $reference = '', ?string $size = null): array
 {
     require_once __DIR__ . '/../config/inventory_db.php';
 
@@ -675,20 +675,36 @@ function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float
     // Do not stop because an older REQ-SALES-* request is still pending;
     // new Sales items must be appended to REQ-SALES-001 instead.
 
-    $itemStmt = $inventoryDb->prepare("
-        SELECT id, item_code, item_name, size, unit, status
-        FROM items
-        WHERE item_code = ?
-        LIMIT 1
-    ");
-    $itemStmt->execute([$productCode]);
+    $itemQuery = "
+        SELECT
+            i.id,
+            i.item_code,
+            i.item_name,
+            i.size,
+            i.unit,
+            i.status,
+            fg.status AS finished_good_status
+        FROM items i
+        INNER JOIN finished_goods fg
+            ON fg.item_code = i.item_code
+        WHERE i.item_code = ?
+          AND i.item_type = 'Finished Good'
+    ";
+    $itemParams = [$productCode];
+    if ($size !== null) {
+        $itemQuery .= " AND i.size = ?";
+        $itemParams[] = $size;
+    }
+    $itemQuery .= " LIMIT 1";
+    $itemStmt = $inventoryDb->prepare($itemQuery);
+    $itemStmt->execute($itemParams);
     $item = $itemStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$item) {
-        throw new RuntimeException("Product {$productCode} was not found in the Inventory System.");
+        throw new RuntimeException("Finished good {$productCode} was not found in the Inventory System.");
     }
-    if (($item['status'] ?? '') !== 'Active') {
-        throw new RuntimeException("Product {$productCode} is inactive in the Inventory System.");
+    if (($item['status'] ?? '') !== 'Active' || ($item['finished_good_status'] ?? '') !== 'Active') {
+        throw new RuntimeException("Finished good {$productCode} is inactive in the Inventory System.");
     }
 
     $warehouseStmt = $inventoryDb->query("
@@ -795,21 +811,121 @@ function syncInventoryStockouts(PDO $salesDb): int
 
     // Reflect Inventory System decisions back to Team Sales.
     $requestRows = $inventoryDb->query("
-        SELECT id, request_number, status, remarks
-        FROM requests
-        WHERE destination = 'Sales'
-          AND request_number LIKE 'REQ-SALES-%'
-        ORDER BY id DESC
-    " )->fetchAll(PDO::FETCH_ASSOC);
+        SELECT
+            r.id AS request_id,
+            r.request_number,
+            r.request_date,
+            r.status,
+            r.approved_at,
+            r.remarks AS request_remarks,
+            ri.item_name,
+            ri.quantity,
+            ri.unit,
+            i.item_code,
+            i.item_name AS catalog_item_name
+        FROM requests r
+        INNER JOIN request_items ri
+            ON ri.request_id = r.id
+        INNER JOIN items i
+            ON i.id = ri.item_id
+        WHERE r.destination = 'Sales'
+          AND r.request_number LIKE 'REQ-SALES-%'
+        ORDER BY r.id DESC, ri.id ASC
+    ")->fetchAll(PDO::FETCH_ASSOC);
 
+    $requestStatuses = [
+        'Pending' => 'Requested',
+        'Approved' => 'Inventory Approved',
+        'Disapproved' => 'Rejected',
+    ];
+    $findLocalRequest = $salesDb->prepare("
+        SELECT id, inventory_request_id, request_status, inventory_approved_at
+        FROM inventory_stockout_approvals
+        WHERE product_code = ?
+          AND (
+                inventory_request_id = ?
+                OR (inventory_request_id IS NULL AND inventory_request_number = ?)
+              )
+        ORDER BY id DESC
+        LIMIT 1
+    ");
+    $updateLocalRequest = $salesDb->prepare("
+        UPDATE inventory_stockout_approvals
+        SET inventory_request_id = COALESCE(inventory_request_id, ?),
+            inventory_request_number = ?,
+            product_name = ?,
+            quantity = ?,
+            unit = ?,
+            request_status = ?,
+            inventory_approved_at = COALESCE(?, inventory_approved_at)
+        WHERE id = ?
+    ");
+    $insertLocalRequest = $salesDb->prepare("
+        INSERT INTO inventory_stockout_approvals
+            (inventory_request_id, inventory_request_number, product_code, product_name,
+             quantity, unit, destination, request_status, requested_at, inventory_approved_at, source_reference, remarks)
+        VALUES (?, ?, ?, ?, ?, ?, 'Sales', ?, ?, ?, ?, ?)
+    ");
     foreach ($requestRows as $requestRow) {
-        if ($requestRow['status'] === 'Disapproved') {
-            $salesDb->prepare("
-                UPDATE inventory_stockout_approvals
-                SET request_status='Rejected', remarks=CONCAT(COALESCE(remarks,''), ' Inventory System: ', ?), reviewed_at=NOW()
-                WHERE inventory_request_id=? AND request_status='Requested'
-            " )->execute([(string)($requestRow['remarks'] ?? 'Request disapproved.'), (int)$requestRow['id']]);
+        $inventoryStatus = (string)($requestRow['status'] ?? '');
+        if (!isset($requestStatuses[$inventoryStatus])) {
+            continue;
         }
+
+        $salesStatus = $requestStatuses[$inventoryStatus];
+        $requestId = (int)$requestRow['request_id'];
+        $requestNumber = (string)$requestRow['request_number'];
+        $productCode = (string)$requestRow['item_code'];
+        $findLocalRequest->execute([
+            $productCode,
+            $requestId,
+            $requestNumber,
+        ]);
+        $localRequest = $findLocalRequest->fetch(PDO::FETCH_ASSOC);
+        $productName = (string)($requestRow['item_name'] ?: $requestRow['catalog_item_name']);
+        $unit = (string)($requestRow['unit'] ?: 'pcs');
+        $approvedAt = $requestRow['approved_at'] ?: null;
+
+        if ($localRequest) {
+            $localStatus = (string)$localRequest['request_status'];
+            $persistedStatus = in_array($localStatus, ['Approved', 'Stocked Out'], true)
+                ? $localStatus
+                : $salesStatus;
+            if (
+                $localStatus !== $persistedStatus
+                || empty($localRequest['inventory_request_id'])
+                || (
+                    $approvedAt !== null
+                    && $localRequest['inventory_approved_at'] !== $approvedAt
+                )
+            ) {
+                $updateLocalRequest->execute([
+                    $requestId,
+                    $requestNumber,
+                    $productName,
+                    $requestRow['quantity'],
+                    $unit,
+                    $persistedStatus,
+                    $approvedAt,
+                    (int)$localRequest['id']
+                ]);
+            }
+            continue;
+        }
+
+        $insertLocalRequest->execute([
+            $requestId,
+            $requestNumber,
+            $productCode,
+            $productName,
+            $requestRow['quantity'],
+            $unit,
+            $salesStatus,
+            $requestRow['request_date'] ?: date('Y-m-d H:i:s'),
+            $approvedAt,
+            $requestNumber,
+            trim((string)($requestRow['request_remarks'] ?? '')) ?: 'Synchronized from Inventory System.',
+        ]);
     }
 
     $rows = $inventoryDb->query("
