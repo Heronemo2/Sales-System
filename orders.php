@@ -25,7 +25,7 @@ $st->execute($params);
 $rows = $st->fetchAll();
 ?>
 <div class="page-toolbar">
-    <p class="muted" style="color: white;">Sales Orders are created from Purchase Orders. The Sales Admin approves each order, which converts it to a Delivery; the Sales Admin then continues billing and collection.</p><a class="primary-btn" href="purchase_orders.php?section=core">Open Purchase Orders</a>
+    <p class="muted" style="color: white;">Sales Orders are created from Purchase Orders. The Sales Admin approves each order, which converts it to a Delivery; the Sales Admin then continues billing and collection.</p>
 </div>
 <div class="module-search">
     <form method="GET"><input type="hidden" name="section" value="core"><input type="search" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search sales orders, customers, products, or status..."><button class="secondary-btn" type="submit">Search</button><?php if ($search !== ''): ?><a class="text-link" href="orders.php?section=core">Clear</a><?php endif; ?></form>

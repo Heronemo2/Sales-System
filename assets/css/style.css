@@ -4007,3 +4007,46 @@ tbody tr:hover td {
     padding: 0 9px;
   }
 }
+
+.order-progress-pagination a,
+.order-progress-pagination > span:not(.page-ellipsis) {
+  display: inline-flex;
+  min-width: 38px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 7px;
+  background: #fff;
+  color: #444;
+  font: inherit;
+  text-decoration: none;
+}
+
+.order-progress-pagination a:hover {
+  border-color: #b00018;
+  color: #b00018;
+}
+
+.order-progress-pagination > span.active {
+  border-color: #b00018;
+  background: #b00018;
+  color: #fff;
+  font-weight: 600;
+}
+
+.order-progress-pagination > span.pagination-disabled {
+  background: #f5f5f5;
+  border-color: #e5e5e5;
+  color: #aaa;
+}
+
+@media (max-width: 600px) {
+  .order-progress-pagination a,
+  .order-progress-pagination > span:not(.page-ellipsis) {
+    height: 34px;
+    min-width: 34px;
+    padding: 0 9px;
+  }
+}

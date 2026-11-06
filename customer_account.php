@@ -179,9 +179,6 @@ include __DIR__ . '/includes/header.php'; ?>
             <h2>Payment</h2>
             <p>Accounts Receivable and Collection are kept together on one billing receipt.</p>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <a class="secondary-btn" href="invoices.php?section=billing">Open Sales Invoices</a>
-        </div>
     </div>
 
     <?php if ($notice): ?>
