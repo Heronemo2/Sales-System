@@ -158,7 +158,7 @@ if ($receipts) {
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
     $collectionStmt = $pdo->prepare("
-        SELECT collection_no, invoice_id, collection_date, due_date, amount, method
+        SELECT col_id, collection_no, invoice_id, collection_date, due_date, amount, method
         FROM collections
         WHERE invoice_id IN ($placeholders)
         ORDER BY collection_date DESC, col_id DESC
@@ -266,6 +266,7 @@ include __DIR__ . '/includes/header.php'; ?>
                     </div>
                     <span class="badge <?= $status === 'Paid' ? 'success' : ($status === 'Partially Paid' ? 'warning' : 'danger') ?>"><?= $status ?></span>
                 </div>
+                <p><a class="secondary-btn" target="_blank" rel="noopener" href="document_export.php?type=invoice&amp;id=<?= $invoiceId ?>">View / Print Sales Invoice PDF</a></p>
                 <div class="receipt-detail-grid" style="margin-top:20px">
                     <div><span>Invoice Date</span><strong><?= niceDate($receipt['invoice_date']) ?></strong></div>
                     <div><span>Due Date</span><strong><?= niceDate($receipt['due_date']) ?></strong></div>
@@ -282,6 +283,7 @@ include __DIR__ . '/includes/header.php'; ?>
                                 <div><span>Date</span><strong><?= niceDate($collection['collection_date']) ?></strong></div>
                                 <div><span>Method</span><strong><?= htmlspecialchars($collection['method']) ?></strong></div>
                                 <div><span>Amount</span><strong><?= peso((float)$collection['amount']) ?></strong></div>
+                                <div><a class="table-action" target="_blank" rel="noopener" href="document_export.php?type=receipt&amp;id=<?= (int)$collection['col_id'] ?>">View / Print Receipt PDF</a></div>
                             </div>
                         <?php endforeach;
                     else: ?><p class="empty-text">No collection recorded.</p><?php endif; ?>

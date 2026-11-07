@@ -536,6 +536,7 @@ CREATE TABLE `users` (
   `role` enum('Sales Admin','Sales Staff','Customer') NOT NULL DEFAULT 'Sales Staff',
   `customer_id` int(10) UNSIGNED DEFAULT NULL,
   `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `account_status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Approved',
   `avatar_path` varchar(255) DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),

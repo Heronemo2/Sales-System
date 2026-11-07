@@ -118,11 +118,12 @@ $openInvoices = $pdo->query("
                     <th>Collection Date</th>
                     <th>Due Date</th>
                     <th>Method</th>
+                    <th>Receipt</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (!$rows): ?><tr class="empty-row">
-                        <td colspan="7">No payments recorded yet.</td>
+                        <td colspan="8">No payments recorded yet.</td>
                     </tr><?php endif; ?>
                 <?php foreach ($rows as $r):
                     $late = !empty($r['due_date']) && strtotime($r['collection_date']) > strtotime($r['due_date']);
@@ -135,6 +136,7 @@ $openInvoices = $pdo->query("
                         <td><?= niceDate($r['collection_date']) ?></td>
                         <td><?= niceDate($r['due_date']) ?> <?= $late ? '<span class="badge danger">Late</span>' : '<span class="badge success">On time</span>' ?></td>
                         <td><span class="badge info"><?= htmlspecialchars($r['method']) ?></span></td>
+                        <td><a class="table-action" target="_blank" rel="noopener" href="document_export.php?type=receipt&amp;id=<?= (int)$r['col_id'] ?>">View / Print PDF</a></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

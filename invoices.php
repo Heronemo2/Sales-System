@@ -43,7 +43,10 @@ include __DIR__ . '/includes/header.php';
             <td><?= niceDate($r['invoice_date']) ?></td>
             <td><?= peso((float)$r['total_amount']) ?></td>
             <td><span class="badge <?= badgeClass($r['status']) ?>"><?= htmlspecialchars($r['status']) ?></span></td>
-            <td><button type="button" class="secondary-btn" data-open-invoice="<?= (int)$r['inv_id'] ?>">View Invoice</button></td>
+            <td>
+              <button type="button" class="secondary-btn" data-open-invoice="<?= (int)$r['inv_id'] ?>">View Invoice</button>
+              <a class="table-action" target="_blank" rel="noopener" href="document_export.php?type=invoice&amp;id=<?= (int)$r['inv_id'] ?>">View / Print PDF</a>
+            </td>
           </tr>
         <?php endforeach; ?>
       </tbody>

@@ -11,6 +11,28 @@ $ordersInProgress = (int)$pdo->query("SELECT COUNT(*) FROM sales_orders WHERE st
 $stockoutApprovals = (int)$pdo->query("SELECT COUNT(*) FROM inventory_stockout_approvals WHERE request_status='Stocked Out'")->fetchColumn();
 $teamSalesStock = (float)$pdo->query("SELECT COALESCE(SUM(stock_quantity),0) FROM inventory WHERE status='Active'")->fetchColumn();
 $receivablesDue = (float)$pdo->query("SELECT COALESCE(SUM(total_amount-amount_paid),0) FROM sales_invoices WHERE status!='Paid'")->fetchColumn();
+$monthStart = date('Y-m-01');
+$nextMonthStart = date('Y-m-01', strtotime('first day of next month'));
+$kpiStmt = $pdo->prepare("
+    SELECT COUNT(*) AS order_count,
+           COALESCE(SUM(total_amount), 0) AS order_sales
+    FROM sales_orders
+    WHERE order_date >= ? AND order_date < ? AND status <> 'Cancelled'
+");
+$kpiStmt->execute([$monthStart, $nextMonthStart]);
+$monthlyOrders = $kpiStmt->fetch();
+$invoiceKpiStmt = $pdo->prepare("
+    SELECT COALESCE(SUM(total_amount), 0) AS invoiced,
+           COALESCE(SUM(amount_paid), 0) AS collected,
+           COUNT(*) AS invoice_count
+    FROM sales_invoices
+    WHERE invoice_date >= ? AND invoice_date < ?
+");
+$invoiceKpiStmt->execute([$monthStart, $nextMonthStart]);
+$monthlyInvoices = $invoiceKpiStmt->fetch();
+$monthlyCollectionRate = (float)$monthlyInvoices['invoiced'] > 0
+    ? min(100, (float)$monthlyInvoices['collected'] / (float)$monthlyInvoices['invoiced'] * 100)
+    : 0;
 $ordersPerPage = 8;
 $totalOrders = (int)$pdo->query('SELECT COUNT(*) FROM sales_orders')->fetchColumn();
 $totalOrderPages = max(1, (int)ceil($totalOrders / $ordersPerPage));
@@ -66,6 +88,21 @@ include __DIR__ . '/includes/header.php';
     <div class="stat-card">
         <div class="stat-icon red">I</div>
         <div><span>Stockout Status</span><strong><?= $stockoutApprovals ?></strong><small>Inventory System stock-outs awaiting sync</small></div>
+    </div>
+</div>
+<div class="panel" style="margin-top:18px">
+    <div class="panel-head">
+        <div>
+            <p class="eyebrow dark">KEY PERFORMANCE INDICATORS</p>
+            <h2>This Month at a Glance</h2>
+            <p class="muted"><?= htmlspecialchars(date('F Y')) ?> · Cancelled orders are excluded from sales KPIs.</p>
+        </div>
+    </div>
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon burgundy">₱</div><div><span>Sales Invoiced</span><strong><?= peso((float)$monthlyInvoices['invoiced']) ?></strong><small><?= (int)$monthlyInvoices['invoice_count'] ?> invoices issued this month</small></div></div>
+        <div class="stat-card"><div class="stat-icon red">O</div><div><span>Orders Placed</span><strong><?= (int)$monthlyOrders['order_count'] ?></strong><small>Non-cancelled orders this month</small></div></div>
+        <div class="stat-card"><div class="stat-icon pink">A</div><div><span>Average Order Value</span><strong><?= peso((int)$monthlyOrders['order_count'] > 0 ? (float)$monthlyOrders['order_sales'] / (int)$monthlyOrders['order_count'] : 0) ?></strong><small>Based on this month's orders</small></div></div>
+        <div class="stat-card"><div class="stat-icon dark">%</div><div><span>Collection Rate</span><strong><?= number_format($monthlyCollectionRate, 1) ?>%</strong><small><?= peso((float)$monthlyInvoices['collected']) ?> collected on this month's invoices</small></div></div>
     </div>
 </div>
 <div class="panel" style="margin-top:18px">

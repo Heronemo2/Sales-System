@@ -38,6 +38,7 @@ $isCustomer = $userRole === 'Customer';
             <?php elseif ($isSalesAdmin): ?>
                 <div class="nav-label">ADMINISTRATION</div>
                 <a class="section-nav <?= $current === 'admin_customers.php' ? 'active' : '' ?>" href="admin_customers.php"><span class="nav-icon">C</span><span>Customer Management</span><span class="section-arrow">›</span></a>
+                <a class="section-nav <?= $current === 'customer_account_approvals.php' ? 'active' : '' ?>" href="customer_account_approvals.php"><span class="nav-icon">V</span><span>Customer Account Verification</span><span class="section-arrow">›</span></a>
                 <a class="section-nav <?= $current === 'sales_quotation_approval.php' ? 'active' : '' ?>" href="sales_quotation_approval.php"><span class="nav-icon">Q</span><span>Sales Quotation Approval</span><span class="section-arrow">›</span></a>
                 <a class="section-nav <?= $current === 'sales_order_approval.php' ? 'active' : '' ?>" href="sales_order_approval.php"><span class="nav-icon">O</span><span>Sales Order Approval</span><span class="section-arrow">›</span></a>
                 <a class="section-nav <?= $current === 'sales_return_approval.php' ? 'active' : '' ?>" href="sales_return_approval.php"><span class="nav-icon">R</span><span>Sales Return Approval</span><span class="section-arrow">›</span></a>

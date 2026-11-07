@@ -55,8 +55,8 @@ $rows = $st->fetchAll();
 <?php if ($notice): ?><div class="alert success"><?= htmlspecialchars($notice) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alert error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
-<div class="panel"><div class="table-wrap"><table><thead><tr><th>Delivery No</th><th>Order No</th><th>Customer Name</th><th>Product</th><th>Date</th><th>Inventory</th><th>Status</th><th>Update</th></tr></thead><tbody>
-<?php if (!$rows): ?><tr class="empty-row"><td colspan="8">No deliveries yet. They appear after the Sales Admin approves a Sales Order.</td></tr><?php endif; ?>
+<div class="panel"><div class="table-wrap"><table><thead><tr><th>Delivery No</th><th>Order No</th><th>Customer Name</th><th>Product</th><th>Date</th><th>Inventory</th><th>Status</th><th>Delivery Receipt</th><th>Update</th></tr></thead><tbody>
+<?php if (!$rows): ?><tr class="empty-row"><td colspan="9">No deliveries yet. They appear after the Sales Admin approves a Sales Order.</td></tr><?php endif; ?>
 <?php foreach ($rows as $r): ?>
     <tr>
         <td><b><?= htmlspecialchars($r['delivery_no']) ?></b></td>
@@ -66,6 +66,7 @@ $rows = $st->fetchAll();
         <td><?= niceDate($r['delivery_date']) ?></td>
         <td><?= !empty($r['inventory_deducted']) ? '<span class="badge success">Deducted</span>' : '<span class="badge neutral">Not deducted</span>' ?></td>
         <td><span class="badge <?= badgeClass($r['status']) ?>"><?= htmlspecialchars($r['status']) ?></span></td>
+        <td><a class="table-action" target="_blank" rel="noopener" href="document_export.php?type=delivery&amp;id=<?= (int)$r['del_id'] ?>">View / Print PDF</a></td>
         <td>
             <?php if ($r['status'] !== 'Delivered'): ?>
             <form method="POST" class="inline-actions">

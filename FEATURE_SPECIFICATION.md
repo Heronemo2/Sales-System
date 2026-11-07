@@ -12,7 +12,7 @@ This specification describes functionality visible in the current repository. It
 |---|---|---|
 | Sales Admin | Manage customers; review and approve sales records; monitor stockout status. | Admin pages enforce the Sales Admin role. |
 | Sales Staff | Process quotations, purchase orders, orders, deliveries, billing, returns, and reports. | Sales workspace pages enforce the Sales Staff role. |
-| Customer | Associated with a customer record and customer-order-request data. | The schema and shared authorization helpers include this role, but `login.php` currently only permits Sales Admin and Sales Staff logins. A complete customer-facing login/order portal is therefore not confirmed by the current implementation. |
+| Customer | Use the Customer-System portal after a Sales Admin approves the registration. | New registrations remain pending and cannot sign in until approved. |
 
 ## 3. Feature inventory
 
@@ -32,14 +32,14 @@ This specification describes functionality visible in the current repository. It
 14. Sales reports and report exports
 15. User profile and account settings
 16. Help center
-17. Document exports (quotation and purchase-order exports)
+17. Document exports (quotation, purchase order, invoice, payment receipt, delivery receipt, and sales report)
 
 ## 4. Feature specifications
 
 ### 4.1 Sign-in, sign-out, and access control
 
 - **Purpose:** Authenticate users and limit pages by role.
-- **Actors:** Sales Admin and Sales Staff; the database also defines Customer users.
+- **Actors:** Sales Admin and Sales Staff use this application; customers sign in to Customer-System after account approval.
 - **Inputs:** Username, password, and acceptance of the Terms of Service.
 - **Behavior:** Verify the password against its stored hash, create a PHP session, record the last-login time, and redirect to the sales dashboard. Sign-out ends the session.
 - **Rules:** Unauthenticated users must sign in. Restricted pages check for their required role.
@@ -49,15 +49,16 @@ This specification describes functionality visible in the current repository. It
   - Users without the required role cannot access protected modules.
   - Sign-out clears the authenticated session.
 - **Implementation/data:** [login.php](./login.php), [logout.php](./logout.php), [auth.php](./includes/auth.php), `users`, `activity_logs`.
-- **Known limitation:** The current login query excludes the Customer role, despite customer-related schema and helper support.
+- Customer registrations are created as pending. The Sales Admin must approve them before the Customer-System permits sign-in.
+- **Implementation:** Customer account approval is handled in [customer_account_approvals.php](./customer_account_approvals.php); the `account_status` field is added by [20261107_add_customer_account_approval.sql](./database/migrations/20261107_add_customer_account_approval.sql).
 
 ### 4.2 Sales dashboard
 
 - **Purpose:** Give staff and admins a high-level view of sales activity.
 - **Actors:** Sales Admin and Sales Staff.
-- **Behavior:** Display summary counts and amounts for pending quotations and customer requests, active orders, outstanding receivables, and stockout activity; show recent order progress.
+- **Behavior:** Display summary counts and amounts for pending quotations and customer requests, active orders, outstanding receivables, and stockout activity; show monthly sales invoiced, order count, average order value, collection rate, and recent order progress.
 - **Rules:** Order progress is derived from the order, delivery, and invoice statuses. The shared completion helper treats an order as completed only when it is paid and delivered.
-- **Acceptance criteria:** Summary cards and recent orders reflect current Sales database records.
+- **Acceptance criteria:** Summary cards, monthly KPIs, and recent orders reflect current Sales database records. Cancelled orders are excluded from monthly sales/order KPIs.
 - **Implementation/data:** [dashboard.php](./dashboard.php), `customer_order_requests`, `sales_quotations`, `sales_orders`, `deliveries`, `sales_invoices`, `inventory_stockout_approvals`.
 
 ### 4.3 Customer management and transaction history
@@ -195,10 +196,10 @@ This specification describes functionality visible in the current repository. It
 ### 4.17 Document exports
 
 - **Purpose:** Provide printable/downloadable sales documents.
-- **Actors:** Authenticated Sales Staff.
-- **Behavior:** Export quotation and purchase-order documents, plus the formal sales report.
-- **Acceptance criteria:** Exported documents use the selected record/year and display the corresponding customer and transaction information.
-- **Implementation:** [quotation_export.php](./quotation_export.php), [po_export.php](./po_export.php), [export_sales_report.php](./export_sales_report.php), [simple_pdf.php](./includes/simple_pdf.php).
+- **Actors:** Authenticated Sales Admin and Sales Staff; customers can view and print only their own invoices in Customer-System.
+- **Behavior:** Export quotation, purchase-order, invoice, payment-receipt, and delivery-receipt PDFs, plus the formal sales report. Sales invoice, payment-receipt, and delivery-receipt PDFs open inline in the browser so they can be reviewed and printed; customer invoices are scoped to the signed-in customer.
+- **Acceptance criteria:** Exported documents use the selected record and display the corresponding customer and transaction information; invoice, receipt, and delivery PDFs are viewable before printing; customer invoice requests cannot access another customer's record.
+- **Implementation:** [quotation_export.php](./quotation_export.php), [po_export.php](./po_export.php), [document_export.php](./document_export.php), [invoices.php](./invoices.php), [export_sales_report.php](./export_sales_report.php), [simple_pdf.php](./includes/simple_pdf.php).
 
 ## 5. Shared business rules and data
 
@@ -212,7 +213,7 @@ This specification describes functionality visible in the current repository. It
 ## 6. Out of scope or not confirmed
 
 - Inventory procurement, manufacturing, and production planning are outside this Sales application.
-- A complete Customer login and self-service portal is not confirmed; current login accepts Sales Admin and Sales Staff.
+- Applying the account approval migration is required before deploying the updated Customer-System registration and login flow.
 - Customer order-request submission is not confirmed in the current PHP pages; existing request records are consumed by quotation processing.
 - Durable persistence of the account preference toggles is not confirmed.
 
