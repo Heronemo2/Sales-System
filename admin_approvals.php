@@ -7,6 +7,8 @@ requireSalesAdmin();
 
 $pdo = getDB();
 
+normalizeExpiredQuotationStatuses($pdo);
+
 $error = '';
 $notice = '';
 

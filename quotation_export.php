@@ -62,7 +62,6 @@ $pdf->textRight(545,360,'TOTAL: PHP '.number_format((float)$q['total_amount'],2)
 $pdf->text(48,405,'CUSTOMER APPROVAL',10,true);
 $pdf->text(48,425,'This quotation is subject to customer approval. Once approved,',9);
 $pdf->text(48,442,'a Purchase Order will be generated in the Sales module.',9);
-$pdf->text(48,480,'Status: '.$q['customer_status'],10,true);
 $pdf->text(48,520,'Thank you for choosing Team Sales.',10);
 header('Content-Type: application/pdf'); header('Content-Disposition: inline; filename="'.$q['quotation_no'].'.pdf"');
 echo $pdf->output();

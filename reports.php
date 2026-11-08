@@ -60,7 +60,14 @@ if ($selectedCustomerId) {
     $selectedCustomer = $stmt->fetch();
     if ($selectedCustomer) {
         $stmt = $pdo->prepare("
-            SELECT c.customer_name customer_name, q.quotation_no, q.status quotation_status,
+            SELECT c.customer_name customer_name, q.quotation_no,
+                   CASE
+                       WHEN q.customer_status = 'Pending'
+                        AND q.valid_until IS NOT NULL
+                        AND q.valid_until < CURDATE()
+                       THEN 'Expired'
+                       ELSE q.status
+                   END quotation_status,
                    po.po_no, po.status po_status,
                    o.order_no, o.status order_status,
                    d.delivery_no, d.status delivery_status,

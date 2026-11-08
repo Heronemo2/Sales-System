@@ -5,6 +5,7 @@ require_once __DIR__ . '/includes/functions.php';
 requireSalesAdmin();
 
 $pdo = getDB();
+normalizeExpiredQuotationStatuses($pdo);
 $error = '';
 $notice = '';
 

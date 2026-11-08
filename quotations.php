@@ -7,6 +7,8 @@ requireSalesWorkspace();
 
 $pdo = getDB();
 
+normalizeExpiredQuotationStatuses($pdo);
+
 $error = '';
 $notice = '';
 
@@ -319,6 +321,13 @@ $search = trim($_GET['search'] ?? '');
 $sql = "
     SELECT
         q.*,
+        CASE
+            WHEN q.customer_status = 'Pending'
+             AND q.valid_until IS NOT NULL
+             AND q.valid_until < CURDATE()
+            THEN 'Expired'
+            ELSE q.customer_status
+        END AS customer_approval_status,
         c.customer_name,
         r.request_no,
 
@@ -348,6 +357,12 @@ if ($search !== '') {
             OR c.customer_name LIKE ?
             OR q.product_code LIKE ?
             OR q.customer_status LIKE ?
+            OR (
+                q.customer_status = 'Pending'
+                AND q.valid_until IS NOT NULL
+                AND q.valid_until < CURDATE()
+                AND LOWER(?) LIKE '%expired%'
+            )
     ";
 
     $like = '%' . $search . '%';
@@ -356,7 +371,8 @@ if ($search !== '') {
         $like,
         $like,
         $like,
-        $like
+        $like,
+        $search
     ];
 }
 
@@ -882,9 +898,9 @@ $requests = $pdo->query("
                     <td>
 
                         <span
-                            class="badge <?= badgeClass($r['customer_status']) ?>"
+                            class="badge <?= badgeClass($r['customer_approval_status']) ?>"
                         >
-                            <?= htmlspecialchars($r['customer_status']) ?>
+                            <?= htmlspecialchars($r['customer_approval_status']) ?>
                         </span>
 
 

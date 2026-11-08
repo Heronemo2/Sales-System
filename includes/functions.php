@@ -160,6 +160,18 @@ function badgeClass(string $status): string {
     };
 }
 
+function normalizeExpiredQuotationStatuses(PDO $pdo): void {
+    $pdo->prepare("
+        UPDATE sales_quotations
+        SET status = 'Expired'
+        WHERE admin_status = 'Approved'
+          AND customer_status = 'Pending'
+          AND valid_until IS NOT NULL
+          AND valid_until < CURDATE()
+          AND status <> 'Expired'
+    ")->execute();
+}
+
 /**
  * Read one finished good directly from Inventory's finished_goods table.
  * Integration mapping: Sales product_code -> Inventory item_code.

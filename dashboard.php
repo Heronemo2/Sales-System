@@ -78,12 +78,12 @@ include __DIR__ . '/includes/header.php';
         <div><span>New Requests</span><strong><?= $requests ?></strong><small>Waiting for Sales quotation</small></div>
     </div>
     <div class="stat-card">
-        <div class="stat-icon burgundy">O</div>
-        <div><span>Orders In Progress</span><strong><?= $ordersInProgress ?></strong><small>Active Sales Orders</small></div>
-    </div>
-    <div class="stat-card">
         <div class="stat-icon dark">₱</div>
         <div><span>Outstanding AR</span><strong><?= peso($receivablesDue) ?></strong><small>Unpaid / partially paid</small></div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon burgundy">O</div>
+        <div><span>Orders In Progress</span><strong><?= $ordersInProgress ?></strong><small>Active Sales Orders</small></div>
     </div>
     <div class="stat-card">
         <div class="stat-icon red">I</div>
