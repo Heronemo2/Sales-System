@@ -35,6 +35,9 @@ if ($isCustomer && $currentPage !== 'customer_portal.php') {
     exit;
 }
 $isSystemAdmin = in_array(($user['role'] ?? ''), ['System Admin', 'Administrator'], true);
+if (($isSalesAdmin || $isSalesStaff) && empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -45,7 +48,7 @@ $isSystemAdmin = in_array(($user['role'] ?? ''), ['System Admin', 'Administrator
     <title><?= htmlspecialchars($pageTitle) ?> | Team Sales</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/formal_override.css?v=20261008">
-    <link rel="stylesheet" href="assets/css/redesign.css?v=20261008">
+    <link rel="stylesheet" href="assets/css/redesign.css?v=20261110">
     <link rel="icon" href="assets/img/logo.png">
 </head>
 
@@ -61,6 +64,32 @@ $isSystemAdmin = in_array(($user['role'] ?? ''), ['System Admin', 'Administrator
                 </div>
 
                 <div class="topbar-actions">
+                    <?php if ($isSalesAdmin || $isSalesStaff): ?>
+                        <div class="notification-menu-wrap">
+                            <button
+                                class="notification-button"
+                                id="notificationButton"
+                                type="button"
+                                aria-label="Notifications"
+                                aria-expanded="false"
+                                data-csrf-token="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                                <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                                    <path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+                                </svg>
+                                <span class="notification-badge" id="notificationBadge" hidden>0</span>
+                            </button>
+                            <section class="notification-dropdown" id="notificationDropdown" aria-label="Notifications">
+                                <div class="notification-dropdown-head">
+                                    <strong>Notifications</strong>
+                                    <button type="button" id="markAllNotificationsRead">Mark all read</button>
+                                </div>
+                                <div class="notification-list" id="notificationList" aria-live="polite">
+                                    <p class="notification-empty">Checking for updates…</p>
+                                </div>
+                                <a class="notification-footer" href="<?= $isSalesAdmin ? 'sales_quotation_approval.php' : 'quotations.php' ?>"><?= $isSalesAdmin ? 'View approval queues' : 'View customer requests' ?></a>
+                            </section>
+                        </div>
+                    <?php endif; ?>
                     <div class="profile-menu-wrap">
                         <button class="top-profile" id="profileMenuButton" type="button" aria-expanded="false">
                             <span class="avatar">

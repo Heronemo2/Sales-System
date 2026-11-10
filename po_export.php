@@ -27,15 +27,7 @@ $st = $pdo->prepare("
         c.province,
         c.phone,
         c.email,
-        c.payment_terms,
-
-        (
-            SELECT fg.item_name
-            FROM inventory_system.finished_goods fg
-            WHERE fg.item_code COLLATE utf8mb4_unicode_ci
-                  = po.product_code COLLATE utf8mb4_unicode_ci
-            LIMIT 1
-        ) AS product_name
+        c.payment_terms
 
     FROM purchase_orders po
 
@@ -53,6 +45,10 @@ if (!$po) {
     http_response_code(404);
     exit('Purchase Order not found.');
 }
+$inventoryProduct = checkInventoryProduct((string)$po['product_code']);
+$po['product_name'] = !empty($inventoryProduct['ok'])
+    ? (string)$inventoryProduct['item_name']
+    : '';
 
 $qty = (int) $po['quantity'];
 $total = (float) $po['total_amount'];

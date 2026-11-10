@@ -173,13 +173,13 @@ function normalizeExpiredQuotationStatuses(PDO $pdo): void {
 }
 
 /**
- * Read one finished good directly from Inventory's finished_goods table.
+ * Read one finished good from Inventory's API catalog.
  * Integration mapping: Sales product_code -> Inventory item_code.
- * Inventory stock comes from finished_goods.quantity.
+ * The Inventory API catalog provides item identity and active status.
  */
 function checkInventoryProduct(string $productCode): array
 {
-    require_once __DIR__ . '/../config/inventory_db.php';
+    require_once __DIR__ . '/../config/inventory_api.php';
 
     $productCode = trim($productCode);
 
@@ -191,95 +191,60 @@ function checkInventoryProduct(string $productCode): array
     }
 
     try {
-        $inventoryDb = getInventoryDB();
-
-        /*
-         * Inventory System is the master product source.
-         * A valid Team Sales product must exist in BOTH:
-         *   items.item_code
-         *   finished_goods.item_code
-         *
-         * finished_goods.quantity is kept by the Inventory System
-         * triggers as the total of inventory.quantity across warehouses.
-         */
-        $stmt = $inventoryDb->prepare("
-            SELECT
-                i.id AS item_id,
-                i.item_code,
-                i.item_name,
-                i.brand,
-                i.size,
-                i.unit,
-                i.status AS item_status,
-                fg.fg_id,
-                fg.category_id,
-                fg.description,
-                fg.reorder_level,
-                fg.status AS fg_status,
-                fg.created_at,
-                COALESCE(SUM(inv.quantity), 0) AS quantity
-            FROM items i
-            INNER JOIN finished_goods fg
-                ON fg.item_code = i.item_code
-            LEFT JOIN inventory inv
-                ON inv.item_id = i.id
-            WHERE i.item_code = ?
-              AND i.item_type = 'Finished Good'
-            GROUP BY
-                i.id,
-                i.item_code,
-                i.item_name,
-                i.brand,
-                i.size,
-                i.unit,
-                i.status,
-                fg.fg_id,
-                fg.category_id,
-                fg.description,
-                fg.reorder_level,
-                fg.status,
-                fg.created_at
-            LIMIT 1
-        ");
-
-        $stmt->execute([$productCode]);
-        $product = $stmt->fetch(PDO::FETCH_ASSOC);
+        $product = null;
+        foreach (getInventoryApiCatalog()['items'] as $item) {
+            if (
+                (string)($item['item_code'] ?? '') === $productCode
+                && ($item['item_type'] ?? '') === 'Finished Good'
+            ) {
+                $product = $item;
+                break;
+            }
+        }
 
         if (!$product) {
             return [
                 'ok' => false,
-                'error' => 'Product is not properly linked in the Inventory System. Check items and finished_goods for ' . $productCode . '.',
+                'error' => 'Product was not found as a finished good in Inventory: ' . $productCode . '.',
                 'item_code' => $productCode
             ];
         }
 
-        $status = ($product['item_status'] === 'Active' && $product['fg_status'] === 'Active')
-            ? 'Active'
-            : 'Inactive';
+        $status = ($product['status'] ?? '') === 'Active' ? 'Active' : 'Inactive';
 
         return [
             'ok' => true,
             'item_id' => (int)$product['item_id'],
-            'fg_id' => (int)$product['fg_id'],
+            'fg_id' => null,
             'item_code' => $product['item_code'],
             'item_name' => $product['item_name'],
-            'brand' => $product['brand'] ?? '',
-            'category_id' => $product['category_id'] ?? '',
             'size' => $product['size'] ?? '',
             'unit' => $product['unit'] ?? 'pcs',
-            'quantity' => (float)($product['quantity'] ?? 0),
-            'description' => $product['description'] ?? '',
-            'reorder_level' => (float)($product['reorder_level'] ?? 0),
             'status' => $status,
-            'created_at' => $product['created_at'] ?? null,
         ];
 
     } catch (Throwable $e) {
         return [
             'ok' => false,
-            'error' => 'Could not connect to the Inventory database: ' . $e->getMessage()
+            'error' => 'Could not read the Inventory API catalog: ' . $e->getMessage()
         ];
     }
+}
+
+function getInventoryFinishedGoods(): array
+{
+    require_once __DIR__ . '/../config/inventory_api.php';
+    $products = [];
+    foreach (getInventoryApiCatalog()['items'] as $item) {
+        if (
+            ($item['item_type'] ?? '') === 'Finished Good'
+            && ($item['status'] ?? '') === 'Active'
+            && trim((string)($item['item_code'] ?? '')) !== ''
+        ) {
+            $products[] = $item;
+        }
+    }
+    return $products;
 }
 
 function getInventoryStockRequest(string $requestNumber): ?array
@@ -290,37 +255,14 @@ function getInventoryStockRequest(string $requestNumber): ?array
         return null;
     }
 
-    try {
-        require_once __DIR__ . '/../config/inventory_db.php';
-
-        $inventoryDb = getInventoryDB();
-
-        $stmt = $inventoryDb->prepare("
-            SELECT
-                r.id,
-                r.request_number,
-                r.status,
-                r.destination,
-                r.expected_receive_date,
-                w.warehouse_name
-            FROM requests r
-            LEFT JOIN request_items ri
-                ON ri.request_id = r.id
-            LEFT JOIN warehouses w
-                ON w.id = ri.warehouse_id
-            WHERE r.request_number = ?
-            LIMIT 1
-        ");
-
-        $stmt->execute([$requestNumber]);
-
-        $request = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return $request ?: null;
-
-    } catch (Throwable $e) {
+    require_once __DIR__ . '/../config/inventory_api.php';
+    $requests = getInventoryApiRequests($requestNumber);
+    if (!$requests) {
         return null;
     }
+    $request = $requests[0];
+    $request['warehouse_name'] = $request['items'][0]['warehouse_name'] ?? null;
+    return $request;
 }
 
 /**
@@ -357,7 +299,6 @@ function evaluateQuotationStock(string $productCode, int $quantity): array
         'status' => $status,
         'stock' => $inventoryProduct,
         'available' => $available,
-        'inventory_system_quantity' => (float)$inventoryProduct['quantity'],
         'team_sales_quantity' => $available,
         'team_sales_inventory' => $teamSalesStock
     ];
@@ -377,247 +318,73 @@ function createInventoryStockRequest(
     string $recipientGmail = '',
     string $remarks = ''
 ): array {
-    require_once __DIR__ . '/../config/inventory_db.php';
-
+    require_once __DIR__ . '/../config/inventory_api.php';
     try {
-        $inventoryDb = getInventoryDB();
-
-        /*
-         * 1. Get the finished good.
-         */
-        $stmt = $inventoryDb->prepare("
-            SELECT
-                fg_id,
-                item_code,
-                item_name,
-                size,
-                unit,
-                quantity,
-                status
-            FROM finished_goods
-            WHERE item_code = ?
-            LIMIT 1
-        ");
-
-        $stmt->execute([trim($productCode)]);
-        $product = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$product) {
-            return [
-                'ok' => false,
-                'message' => 'Product was not found in Inventory.'
-            ];
+        if ($requiredQuantity <= 0 || floor($requiredQuantity) !== $requiredQuantity) {
+            throw new InvalidArgumentException('Inventory requests must use a positive whole-number quantity.');
         }
 
-        if (($product['status'] ?? '') !== 'Active') {
-            return [
-                'ok' => false,
-                'message' => 'This product is inactive in Inventory.'
-            ];
-        }
-
-        /*
-         * 2. Calculate missing stock.
-         */
-        $available = (float)($product['quantity'] ?? 0);
-        $missing = $requiredQuantity - $available;
-
-        if ($missing <= 0) {
-            return [
-                'ok' => true,
-                'already_available' => true,
-                'message' => 'Enough stock is already available.',
-                'available' => $available,
-                'requested' => 0
-            ];
-        }
-
-        /*
-         * 3. Find the corresponding Inventory item.
-         *
-         * request_items requires items.id.
-         */
-        $stmt = $inventoryDb->prepare("
-            SELECT
-                id,
-                item_name,
-                size,
-                unit
-            FROM items
-            WHERE item_code = ?
-            LIMIT 1
-        ");
-
-        $stmt->execute([$product['item_code']]);
-        $item = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$item) {
-            return [
-                'ok' => false,
-                'message' => 'The finished good is not linked to an Inventory item.'
-            ];
-        }
-
-        /*
-         * 4. Find a warehouse.
-         *
-         * The existing Inventory request sheet requires warehouse_id.
-         */
-        $stmt = $inventoryDb->query("
-            SELECT id, warehouse_name
-            FROM warehouses
-            ORDER BY id ASC
-            LIMIT 1
-        ");
-
-        $warehouse = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$warehouse) {
-            return [
-                'ok' => false,
-                'message' => 'No Inventory warehouse was found.'
-            ];
-        }
-
-        /*
-         * 5. Find an Inventory user to own the request.
-         *
-         * We are NOT changing the Inventory users table.
-         * We only use an existing user ID.
-         */
-        $stmt = $inventoryDb->query("
-            SELECT id
-            FROM users
-            WHERE role = 'ADMIN'
-            ORDER BY id ASC
-            LIMIT 1
-        ");
-
-        $inventoryUser = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$inventoryUser) {
-            return [
-                'ok' => false,
-                'message' => 'No Inventory administrator was found.'
-            ];
-        }
-
-        /*
-         * 6. Create the request.
-         */
-        $inventoryDb->beginTransaction();
-
-        try {
-
-            $requestNumber =
-                'REQ-SALES-' .
-                date('YmdHis') .
-                '-' .
-                random_int(10, 99);
-
-            $expectedReceiveDate = date(
-                'Y-m-d',
-                strtotime('+3 days')
-            );
-
-            /*
-             * Request header.
-             */
-            $stmt = $inventoryDb->prepare("
-                INSERT INTO requests (
-                    request_number,
-                    requested_by,
-                    request_date,
-                    status,
-                    remarks,
-                    recipient_name,
-                    recipient_gmail,
-                    destination,
-                    expected_receive_date
-                )
-                VALUES (
-                    ?,
-                    ?,
-                    CURDATE(),
-                    'Pending',
-                    ?,
-                    ?,
-                    ?,
-                    'Sales',
-                    ?
-                )
-            ");
-
-            $requestRemarks = $remarks !== ''
-                ? $remarks
-                : 'Stock request from Team Sales.';
-
-            $stmt->execute([
-                $requestNumber,
-                (int)$inventoryUser['id'],
-                $requestRemarks,
-                $recipientName,
-                $recipientGmail,
-                $expectedReceiveDate
-            ]);
-
-            $requestId = (int)$inventoryDb->lastInsertId();
-
-            /*
-             * Request item.
-             */
-            $stmt = $inventoryDb->prepare("
-                INSERT INTO request_items (
-                    request_id,
-                    item_id,
-                    item_name,
-                    size,
-                    warehouse_id,
-                    quantity,
-                    unit
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ");
-
-            $stmt->execute([
-                $requestId,
-                (int)$item['id'],
-                $item['item_name'],
-                $item['size'] ?? '',
-                (int)$warehouse['id'],
-                $missing,
-                $item['unit'] ?? $product['unit'] ?? 'pcs'
-            ]);
-
-            $inventoryDb->commit();
-
-            return [
-                'ok' => true,
-                'request_id' => $requestId,
-                'request_number' => $requestNumber,
-                'available' => $available,
-                'required' => $requiredQuantity,
-                'requested' => $missing,
-                'status' => 'Pending',
-                'message' => 'Stock request was sent to Inventory.'
-            ];
-
-        } catch (Throwable $e) {
-
-            if ($inventoryDb->inTransaction()) {
-                $inventoryDb->rollBack();
+        $catalog = getInventoryApiCatalog();
+        $product = null;
+        foreach ($catalog['items'] as $item) {
+            if (
+                (string)($item['item_code'] ?? '') === trim($productCode)
+                && ($item['item_type'] ?? '') === 'Finished Good'
+                && ($item['status'] ?? '') === 'Active'
+            ) {
+                $product = $item;
+                break;
             }
-
-            throw $e;
+        }
+        if (!$product) {
+            throw new RuntimeException('Product is not an active finished good in Inventory.');
+        }
+        $warehouseId = (int)($catalog['warehouses'][0]['warehouse_id'] ?? 0);
+        if ($warehouseId <= 0) {
+            throw new RuntimeException('No active Inventory warehouse was found.');
         }
 
-    } catch (Throwable $e) {
-
+        $response = inventoryApiRequest('POST', 'requests.php', [
+            'destination' => 'Sales',
+            'warehouse_id' => $warehouseId,
+            'items' => [[
+                'item_id' => (int)$product['item_id'],
+                'quantity' => (int)$requiredQuantity
+            ]],
+            'requester_name' => 'Team Sales',
+            'recipient_name' => $recipientName !== '' ? $recipientName : 'Team Sales',
+            'recipient_email' => $recipientGmail,
+            'remarks' => $remarks !== '' ? $remarks : 'Stock request from Team Sales.',
+            'expected_delivery_date' => date('Y-m-d', strtotime('+3 days'))
+        ]);
+        $request = $response['data'] ?? [];
+        $requestNumber = trim((string)($request['request_number'] ?? ''));
+        if ($requestNumber === '') {
+            throw new RuntimeException('Inventory API accepted the request but returned no request number.');
+        }
+        $createdRequests = getInventoryApiRequests($requestNumber);
+        $createdRequest = null;
+        foreach ($createdRequests as $candidate) {
+            if ((string)($candidate['request_number'] ?? '') === $requestNumber) {
+                $createdRequest = $candidate;
+                break;
+            }
+        }
+        $requestId = (int)($createdRequest['id'] ?? 0);
+        if ($requestId <= 0) {
+            throw new RuntimeException('Inventory API accepted the request but its request ID could not be retrieved.');
+        }
         return [
-            'ok' => false,
-            'message' => 'Could not create Inventory stock request: ' .
-                         $e->getMessage()
+            'ok' => true,
+            'request_id' => $requestId,
+            'request_number' => $requestNumber,
+            'required' => $requiredQuantity,
+            'requested' => $requiredQuantity,
+            'status' => (string)($createdRequest['status'] ?? $request['request_status'] ?? 'Pending'),
+            'message' => 'Stock request was sent to Inventory.'
         ];
+    } catch (Throwable $e) {
+        return ['ok' => false, 'message' => 'Could not create Inventory stock request: ' . $e->getMessage()];
     }
 }
 /**
@@ -674,141 +441,141 @@ function createPurchaseOrderFromQuotation(PDO $pdo, int $quotationId): ?string {
  */
 function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float $quantity, string $reference = '', ?string $size = null): array
 {
-    require_once __DIR__ . '/../config/inventory_db.php';
-
+    require_once __DIR__ . '/../config/inventory_api.php';
     $productCode = trim($productCode);
-    if ($productCode === '' || $quantity <= 0) {
-        throw new RuntimeException('A valid product code and quantity are required.');
+    if ($productCode === '' || $quantity <= 0 || floor($quantity) !== $quantity) {
+        throw new RuntimeException('A valid product code and positive whole-number quantity are required.');
     }
 
-    $inventoryDb = getInventoryDB();
-
-    // Team Sales uses one fixed request header.
-    // Do not stop because an older REQ-SALES-* request is still pending;
-    // new Sales items must be appended to REQ-SALES-001 instead.
-
-    $itemQuery = "
-        SELECT
-            i.id,
-            i.item_code,
-            i.item_name,
-            i.size,
-            i.unit,
-            i.status,
-            fg.status AS finished_good_status
-        FROM items i
-        INNER JOIN finished_goods fg
-            ON fg.item_code = i.item_code
-        WHERE i.item_code = ?
-          AND i.item_type = 'Finished Good'
-    ";
-    $itemParams = [$productCode];
-    if ($size !== null) {
-        $itemQuery .= " AND i.size = ?";
-        $itemParams[] = $size;
+    $catalog = getInventoryApiCatalog();
+    $item = null;
+    foreach ($catalog['items'] as $candidate) {
+        if (
+            (string)($candidate['item_code'] ?? '') === $productCode
+            && ($candidate['item_type'] ?? '') === 'Finished Good'
+            && ($candidate['status'] ?? '') === 'Active'
+            && ($size === null || (string)($candidate['size'] ?? '') === $size)
+        ) {
+            $item = $candidate;
+            break;
+        }
     }
-    $itemQuery .= " LIMIT 1";
-    $itemStmt = $inventoryDb->prepare($itemQuery);
-    $itemStmt->execute($itemParams);
-    $item = $itemStmt->fetch(PDO::FETCH_ASSOC);
-
     if (!$item) {
-        throw new RuntimeException("Finished good {$productCode} was not found in the Inventory System.");
+        throw new RuntimeException("Active finished good {$productCode} was not found in Inventory.");
     }
-    if (($item['status'] ?? '') !== 'Active' || ($item['finished_good_status'] ?? '') !== 'Active') {
-        throw new RuntimeException("Finished good {$productCode} is inactive in the Inventory System.");
-    }
-
-    $warehouseStmt = $inventoryDb->query("
-        SELECT id, warehouse_name
-        FROM warehouses
-        WHERE status = 'Active'
-        ORDER BY id ASC
-        LIMIT 1
-    ");
-    $warehouse = $warehouseStmt->fetch(PDO::FETCH_ASSOC);
-    if (!$warehouse) {
+    $warehouseId = (int)($catalog['warehouses'][0]['warehouse_id'] ?? 0);
+    if ($warehouseId <= 0) {
         throw new RuntimeException('No active Inventory warehouse was found.');
     }
 
-    // Team Sales is an external requester. NULL is valid for requested_by
-    // and makes this request appear under Inventory System's Incoming Requests.
-    $incomingRequesterId = null;
-
-    $inventoryDb->beginTransaction();
-    try {
-        // Generate the next Team Sales request number.
-        // Only numeric REQ-SALES-### values are part of this sequence.
-        $nextStmt = $inventoryDb->query("
-            SELECT COALESCE(MAX(CAST(SUBSTRING(request_number, 11) AS UNSIGNED)), 0) AS max_no
-            FROM requests
-            WHERE destination = 'Sales'
-              AND request_number REGEXP '^REQ-SALES-[0-9]+$'
-        ");
-        $nextNumber = ((int)$nextStmt->fetchColumn()) + 1;
-        $requestNumber = 'REQ-SALES-' . str_pad((string)$nextNumber, 3, '0', STR_PAD_LEFT);
-
-        $stmt = $inventoryDb->prepare("
-            INSERT INTO requests (
-                request_number, requested_by, request_date, status, remarks,
-                recipient_name, recipient_gmail, destination, expected_receive_date
-            )
-            VALUES (?, ?, CURDATE(), 'Pending', ?, 'Team Sales', 'team.sales@local', 'Sales', ?)
-        ");
-        $stmt->execute([
-            $requestNumber,
-            $incomingRequesterId,
-            'Stock-out requested by Team Sales because Team Sales inventory is insufficient.' . ($reference !== '' ? ' Reference: ' . $reference : ''),
-            date('Y-m-d', strtotime('+3 days'))
-        ]);
-        $requestId = (int)$inventoryDb->lastInsertId();
-
-        $stmt = $inventoryDb->prepare("
-            INSERT INTO request_items (
-                request_id, item_id, item_name, size, warehouse_id, quantity, unit
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $requestId,
-            (int)$item['id'],
-            $item['item_name'],
-            $item['size'] ?? '',
-            (int)$warehouse['id'],
-            $quantity,
-            $item['unit'] ?? 'pcs'
-        ]);
-
-        $inventoryDb->commit();
-
-        // Keep a Team Sales-side record of the request.
-        $salesDb->prepare("
-            INSERT INTO inventory_stockout_approvals
-            (inventory_request_id, inventory_request_number, product_code, product_name, quantity, unit, destination, request_status, requested_at, source_reference, remarks)
-            VALUES (?, ?, ?, ?, ?, ?, 'Sales', 'Requested', NOW(), ?, ?)
-        ")->execute([
-            $requestId,
-            $requestNumber,
-            $item['item_code'],
-            $item['item_name'],
-            $quantity,
-            $item['unit'] ?? 'pcs',
-            $reference !== '' ? $reference : null,
-            $reference !== '' ? 'Requested for ' . $reference : 'Requested from Inventory System.'
-        ]);
-
-        return [
-            'ok' => true,
-            'request_id' => $requestId,
-            'request_number' => $requestNumber,
-            'status' => 'Pending',
-            'message' => 'Stock-out request sent to Inventory System.'
-        ];
-    } catch (Throwable $e) {
-        if ($inventoryDb->inTransaction()) {
-            $inventoryDb->rollBack();
+    $response = inventoryApiRequest('POST', 'requests.php', [
+        'destination' => 'Sales',
+        'warehouse_id' => $warehouseId,
+        'items' => [[
+            'item_id' => (int)$item['item_id'],
+            'quantity' => (int)$quantity
+        ]],
+        'requester_name' => 'Team Sales',
+        'recipient_name' => 'Team Sales',
+        'recipient_email' => 'team.sales@local',
+        'remarks' => 'Stock-out requested by Team Sales because Team Sales inventory is insufficient.'
+            . ($reference !== '' ? ' Reference: ' . $reference : ''),
+        'expected_delivery_date' => date('Y-m-d', strtotime('+3 days'))
+    ]);
+    $request = $response['data'] ?? [];
+    $requestNumber = (string)($request['request_number'] ?? '');
+    if ($requestNumber === '') {
+        throw new RuntimeException('Inventory API accepted the request but returned no request number.');
+    }
+    $createdRequests = getInventoryApiRequests($requestNumber);
+    $createdRequest = null;
+    foreach ($createdRequests as $candidate) {
+        if ((string)($candidate['request_number'] ?? '') === $requestNumber) {
+            $createdRequest = $candidate;
+            break;
         }
-        throw $e;
+    }
+    $requestId = (int)($createdRequest['id'] ?? 0);
+    if ($requestId <= 0) {
+        throw new RuntimeException('Inventory API accepted the request but its request ID could not be retrieved.');
+    }
+
+    $salesDb->prepare("
+        INSERT INTO inventory_stockout_approvals
+        (inventory_request_id, inventory_request_number, product_code, product_name, quantity, unit, destination, request_status, requested_at, source_reference, remarks)
+        VALUES (?, ?, ?, ?, ?, ?, 'Sales', 'Requested', NOW(), ?, ?)
+    ")->execute([
+        $requestId,
+        $requestNumber,
+        $item['item_code'],
+        $item['item_name'],
+        $quantity,
+        $item['unit'] ?? 'pcs',
+        $reference !== '' ? $reference : null,
+        $reference !== '' ? 'Requested for ' . $reference : 'Requested from Inventory System.'
+    ]);
+
+    return [
+        'ok' => true,
+        'request_id' => $requestId,
+        'request_number' => $requestNumber,
+        'status' => (string)($createdRequest['status'] ?? $request['request_status'] ?? 'Pending'),
+        'message' => 'Stock-out request sent to Inventory System.'
+    ];
+}
+
+function notifySalesAdminsInventoryApproved(
+    PDO $salesDb,
+    int $inventoryRequestId,
+    string $requestNumber,
+    string $productCode,
+    string $productName,
+    float $quantity,
+    string $unit
+): void {
+    $admins = $salesDb->query("
+        SELECT user_id
+        FROM users
+        WHERE role = 'Sales Admin' AND status = 'Active'
+    ")->fetchAll(PDO::FETCH_COLUMN);
+    $insert = $salesDb->prepare("
+        INSERT IGNORE INTO user_notifications (user_id, event_key, title, message, link)
+        VALUES (?, ?, ?, ?, ?)
+    ");
+    $eventKey = 'inventory-approved:' . $inventoryRequestId . ':' . $productCode;
+    $message = $requestNumber . ' was approved by Inventory: '
+        . $productName . ' (' . rtrim(rtrim(number_format($quantity, 2, '.', ''), '0'), '.') . ' ' . $unit . ').';
+
+    foreach ($admins as $adminId) {
+        $insert->execute([
+            (int)$adminId,
+            $eventKey,
+            'Inventory request approved',
+            $message,
+            'inventory_stockout_approval.php',
+        ]);
+    }
+}
+
+function notifySalesAdminsPendingApproval(
+    PDO $salesDb,
+    string $eventKey,
+    string $title,
+    string $message,
+    string $link
+): void {
+    $admins = $salesDb->query("
+        SELECT user_id
+        FROM users
+        WHERE role = 'Sales Admin' AND status = 'Active'
+    ")->fetchAll(PDO::FETCH_COLUMN);
+    $insert = $salesDb->prepare("
+        INSERT IGNORE INTO user_notifications (user_id, event_key, title, message, link)
+        VALUES (?, ?, ?, ?, ?)
+    ");
+
+    foreach ($admins as $adminId) {
+        $insert->execute([(int)$adminId, $eventKey, $title, $message, $link]);
     }
 }
 
@@ -818,52 +585,87 @@ function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float
  */
 function syncInventoryStockouts(PDO $salesDb): int
 {
-    require_once __DIR__ . '/../config/inventory_db.php';
-    $inventoryDb = getInventoryDB();
+    require_once __DIR__ . '/../config/inventory_api.php';
 
-    // Reflect Inventory System decisions back to Team Sales.
-    $requestRows = $inventoryDb->query("
-        SELECT
-            r.id AS request_id,
-            r.request_number,
-            r.request_date,
-            r.status,
-            r.approved_at,
-            r.remarks AS request_remarks,
-            ri.item_name,
-            ri.quantity,
-            ri.unit,
-            i.item_code,
-            i.item_name AS catalog_item_name
-        FROM requests r
-        INNER JOIN request_items ri
-            ON ri.request_id = r.id
-        INNER JOIN items i
-            ON i.id = ri.item_id
-        WHERE r.destination = 'Sales'
-          AND r.request_number LIKE 'REQ-SALES-%'
-        ORDER BY r.id DESC, ri.id ASC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    $requestRows = [];
+    $stockOutRows = [];
+    $findLocalProductCode = $salesDb->prepare("
+        SELECT product_code
+        FROM inventory_stockout_approvals
+        WHERE (inventory_request_id = ? OR inventory_request_number = ?)
+          AND product_code <> ''
+        ORDER BY (inventory_request_id = ?) DESC, id DESC
+        LIMIT 1
+    ");
+    foreach (getInventoryApiRequests() as $request) {
+        $requestNumber = (string)($request['request_number'] ?? '');
+        foreach (($request['items'] ?? []) as $item) {
+            $isSalesDemoRequest = strpos($requestNumber, 'REQ-DEMO-SALES-') === 0;
+            if (($request['destination'] ?? 'Sales') === 'Sales' && !$isSalesDemoRequest) {
+                $requestId = (int)($request['id'] ?? 0);
+                $itemCode = trim((string)($item['item_code'] ?? ''));
+                if ($itemCode === '' && $requestId > 0 && $requestNumber !== '') {
+                    $findLocalProductCode->execute([$requestId, $requestNumber, $requestId]);
+                    $itemCode = trim((string)($findLocalProductCode->fetchColumn() ?: ''));
+                }
+                $requestRows[] = [
+                    'request_id' => $requestId,
+                    'request_number' => $requestNumber,
+                    'request_date' => $request['request_date'] ?? null,
+                    'status' => $request['status'] ?? '',
+                    'approved_at' => $request['approved_at'] ?? null,
+                    'request_remarks' => $request['remarks'] ?? '',
+                    'item_name' => $item['item_name'] ?? '',
+                    'quantity' => $item['requested_quantity'] ?? 0,
+                    'approved_quantity' => $item['approved_quantity'] ?? null,
+                    'unit' => $item['unit'] ?? 'pcs',
+                    'item_code' => $itemCode,
+                    'catalog_item_name' => $item['item_name'] ?? '',
+                ];
+            }
+
+            // Any stock-out destined for Sales must be imported, including
+            // requests created directly in Inventory with its own request number.
+            if (!empty($item['stock_out_id']) && ($item['stock_out_destination'] ?? '') === 'Sales') {
+                $stockOutRows[] = [
+                    'id' => $item['stock_out_id'],
+                    'stock_out_number' => $item['stock_out_number'] ?? '',
+                    'item_id' => $item['item_id'] ?? 0,
+                    'quantity' => $item['stock_out_quantity'] ?? 0,
+                    'destination' => $item['stock_out_destination'],
+                    'reference_number' => $item['stock_out_reference'] ?? $requestNumber,
+                    'date' => $item['stock_out_date'] ?? $request['request_date'] ?? date('Y-m-d'),
+                    'item_code' => $item['item_code'] ?? '',
+                    'item_name' => $item['item_name'] ?? '',
+                    'unit' => $item['unit'] ?? 'pcs',
+                ];
+            }
+        }
+    }
 
     $requestStatuses = [
         'Pending' => 'Requested',
-        'Approved' => 'Inventory Approved',
+        'Approved' => 'Approved',
+        'Partially Approved' => 'Approved',
         'Disapproved' => 'Rejected',
     ];
     $findLocalRequest = $salesDb->prepare("
-        SELECT id, inventory_request_id, request_status, inventory_approved_at
+        SELECT id, inventory_request_id, inventory_stock_out_id, request_status, inventory_approved_at
         FROM inventory_stockout_approvals
         WHERE product_code = ?
           AND (
                 inventory_request_id = ?
-                OR (inventory_request_id IS NULL AND inventory_request_number = ?)
+                OR inventory_request_number = ?
               )
-        ORDER BY id DESC
+        ORDER BY (inventory_request_id = ?) DESC,
+                 (inventory_stock_out_id IS NULL) DESC,
+                 id DESC
         LIMIT 1
+        FOR UPDATE
     ");
     $updateLocalRequest = $salesDb->prepare("
         UPDATE inventory_stockout_approvals
-        SET inventory_request_id = COALESCE(inventory_request_id, ?),
+        SET inventory_request_id = ?,
             inventory_request_number = ?,
             product_name = ?,
             quantity = ?,
@@ -871,6 +673,19 @@ function syncInventoryStockouts(PDO $salesDb): int
             request_status = ?,
             inventory_approved_at = COALESCE(?, inventory_approved_at)
         WHERE id = ?
+    ");
+    $claimApprovedRequest = $salesDb->prepare("
+        UPDATE inventory_stockout_approvals
+        SET inventory_request_id = ?,
+            inventory_request_number = ?,
+            product_name = ?,
+            quantity = ?,
+            unit = ?,
+            request_status = 'Approved',
+            inventory_approved_at = COALESCE(?, inventory_approved_at),
+            stocked_out_at = COALESCE(?, stocked_out_at)
+        WHERE id = ?
+          AND request_status NOT IN ('Approved', 'Stocked Out')
     ");
     $insertLocalRequest = $salesDb->prepare("
         INSERT INTO inventory_stockout_approvals
@@ -884,84 +699,157 @@ function syncInventoryStockouts(PDO $salesDb): int
             continue;
         }
 
-        $salesStatus = $requestStatuses[$inventoryStatus];
         $requestId = (int)$requestRow['request_id'];
         $requestNumber = (string)$requestRow['request_number'];
         $productCode = (string)$requestRow['item_code'];
-        $findLocalRequest->execute([
-            $productCode,
-            $requestId,
-            $requestNumber,
-        ]);
-        $localRequest = $findLocalRequest->fetch(PDO::FETCH_ASSOC);
-        $productName = (string)($requestRow['item_name'] ?: $requestRow['catalog_item_name']);
-        $unit = (string)($requestRow['unit'] ?: 'pcs');
-        $approvedAt = $requestRow['approved_at'] ?: null;
-
-        if ($localRequest) {
-            $localStatus = (string)$localRequest['request_status'];
-            $persistedStatus = in_array($localStatus, ['Approved', 'Stocked Out'], true)
-                ? $localStatus
-                : $salesStatus;
+        if ($requestId <= 0 || $requestNumber === '' || $productCode === '') {
+            throw new RuntimeException('Inventory API returned a Sales request with incomplete request or item details.');
+        }
+        $salesDb->beginTransaction();
+        try {
+            $findLocalRequest->execute([
+                $productCode,
+                $requestId,
+                $requestNumber,
+                $requestId,
+            ]);
+            $localRequest = $findLocalRequest->fetch(PDO::FETCH_ASSOC);
+            $productName = (string)($requestRow['item_name'] ?: $requestRow['catalog_item_name']);
+            $unit = (string)($requestRow['unit'] ?: 'pcs');
+            $approvedAt = $requestRow['approved_at'] ?: null;
+            $requestedQuantity = (float)$requestRow['quantity'];
+            $approvedQuantity = (float)($requestRow['approved_quantity'] ?? 0);
+            $isApproved = in_array($inventoryStatus, ['Approved', 'Partially Approved'], true)
+                && $approvedQuantity > 0;
+            $salesStatus = $isApproved
+                ? 'Approved'
+                : $requestStatuses[$inventoryStatus];
             if (
-                $localStatus !== $persistedStatus
-                || empty($localRequest['inventory_request_id'])
-                || (
-                    $approvedAt !== null
-                    && $localRequest['inventory_approved_at'] !== $approvedAt
-                )
+                in_array($inventoryStatus, ['Approved', 'Partially Approved'], true)
+                && !$isApproved
             ) {
-                $updateLocalRequest->execute([
+                $salesStatus = 'Rejected';
+            }
+            $quantityToPersist = $isApproved ? $approvedQuantity : $requestedQuantity;
+            $shouldAddStock = $isApproved;
+
+            if ($localRequest) {
+                $localStatus = (string)$localRequest['request_status'];
+                if (in_array($localStatus, ['Approved', 'Stocked Out'], true)) {
+                    $salesStatus = $localStatus;
+                    $shouldAddStock = false;
+                }
+                if ($localStatus === 'Requested' && $isApproved) {
+                    notifySalesAdminsInventoryApproved(
+                        $salesDb,
+                        $requestId,
+                        $requestNumber,
+                        $productCode,
+                        $productName,
+                        $quantityToPersist,
+                        $unit
+                    );
+                }
+                if (
+                    $localStatus !== $salesStatus
+                    || (int)$localRequest['inventory_request_id'] !== $requestId
+                    || (
+                        $approvedAt !== null
+                        && $localRequest['inventory_approved_at'] !== $approvedAt
+                    )
+                ) {
+                    if ($shouldAddStock) {
+                        $claimApprovedRequest->execute([
+                            $requestId,
+                            $requestNumber,
+                            $productName,
+                            $quantityToPersist,
+                            $unit,
+                            $approvedAt,
+                            $approvedAt,
+                            (int)$localRequest['id']
+                        ]);
+                        $shouldAddStock = $claimApprovedRequest->rowCount() > 0;
+                    } else {
+                        $updateLocalRequest->execute([
+                            $requestId,
+                            $requestNumber,
+                            $productName,
+                            $quantityToPersist,
+                            $unit,
+                            $salesStatus,
+                            $approvedAt,
+                            (int)$localRequest['id']
+                        ]);
+                    }
+                } elseif ($shouldAddStock) {
+                    $claimApprovedRequest->execute([
+                        $requestId,
+                        $requestNumber,
+                        $productName,
+                        $quantityToPersist,
+                        $unit,
+                        $approvedAt,
+                        $approvedAt,
+                        (int)$localRequest['id']
+                    ]);
+                    $shouldAddStock = $claimApprovedRequest->rowCount() > 0;
+                }
+            } else {
+                $insertLocalRequest->execute([
                     $requestId,
                     $requestNumber,
+                    $productCode,
                     $productName,
-                    $requestRow['quantity'],
+                    $quantityToPersist,
                     $unit,
-                    $persistedStatus,
+                    $salesStatus,
+                    $requestRow['request_date'] ?: date('Y-m-d H:i:s'),
                     $approvedAt,
-                    (int)$localRequest['id']
+                    $requestNumber,
+                    trim((string)($requestRow['request_remarks'] ?? '')) ?: 'Synchronized from Inventory System.',
+                ]);
+                $shouldAddStock = $isApproved;
+                if ($isApproved) {
+                    notifySalesAdminsInventoryApproved(
+                        $salesDb,
+                        $requestId,
+                        $requestNumber,
+                        $productCode,
+                        $productName,
+                        $quantityToPersist,
+                        $unit
+                    );
+                }
+            }
+
+            if ($shouldAddStock) {
+                $salesDb->prepare("
+                    INSERT INTO inventory (product_code, product_name, unit, stock_quantity, status)
+                    VALUES (?, ?, ?, ?, 'Active')
+                    ON DUPLICATE KEY UPDATE
+                        product_name = VALUES(product_name),
+                        unit = VALUES(unit),
+                        stock_quantity = stock_quantity + VALUES(stock_quantity),
+                        status = 'Active',
+                        last_updated = NOW()
+                ")->execute([
+                    $productCode,
+                    $productName,
+                    $unit,
+                    $quantityToPersist,
                 ]);
             }
-            continue;
+            $salesDb->commit();
+        } catch (Throwable $e) {
+            if ($salesDb->inTransaction()) {
+                $salesDb->rollBack();
+            }
+            throw $e;
         }
-
-        $insertLocalRequest->execute([
-            $requestId,
-            $requestNumber,
-            $productCode,
-            $productName,
-            $requestRow['quantity'],
-            $unit,
-            $salesStatus,
-            $requestRow['request_date'] ?: date('Y-m-d H:i:s'),
-            $approvedAt,
-            $requestNumber,
-            trim((string)($requestRow['request_remarks'] ?? '')) ?: 'Synchronized from Inventory System.',
-        ]);
     }
 
-    $rows = $inventoryDb->query("
-        SELECT
-            so.id,
-            so.stock_out_number,
-            so.item_id,
-            so.quantity,
-            so.destination,
-            so.reference_number,
-            so.date,
-            i.item_code,
-            i.item_name,
-            i.unit
-        FROM stock_out so
-        JOIN items i ON i.id = so.item_id
-        LEFT JOIN requests r ON r.request_number = so.reference_number
-        WHERE so.destination = 'Sales'
-          AND (
-                so.reference_number LIKE 'REQ-SALES-%'
-                OR (r.id IS NOT NULL AND r.destination = 'Sales')
-              )
-        ORDER BY so.id DESC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    $rows = $stockOutRows;
 
     $inserted = 0;
     $stmt = $salesDb->prepare("
@@ -983,26 +871,54 @@ function syncInventoryStockouts(PDO $salesDb): int
     ");
 
     foreach ($rows as $row) {
-        // If the Team Sales request exists, preserve its local request row.
-        $existing = $salesDb->prepare("
+        $stockOutId = (int)$row['id'];
+        $requestNumber = $row['reference_number'] ?: null;
+
+        // A stock-out already linked by its unique Inventory ID was imported earlier.
+        $existingStockOut = $salesDb->prepare("
             SELECT id, request_status
             FROM inventory_stockout_approvals
             WHERE inventory_stock_out_id = ?
-               OR (
-                    inventory_stock_out_id IS NULL
-                    AND inventory_request_number = ?
-                    AND product_code = ?
-               )
+            LIMIT 1
+        ");
+        $existingStockOut->execute([$stockOutId]);
+        $linkedStockOut = $existingStockOut->fetch(PDO::FETCH_ASSOC);
+        if ($linkedStockOut) {
+            $salesDb->prepare("
+                UPDATE inventory_stockout_approvals
+                SET stock_out_number = ?,
+                    inventory_request_number = COALESCE(?, inventory_request_number),
+                    product_code = ?,
+                    product_name = ?,
+                    quantity = ?,
+                    unit = ?,
+                    stocked_out_at = ?
+                WHERE id = ?
+            ")->execute([
+                $row['stock_out_number'],
+                $requestNumber,
+                $row['item_code'],
+                $row['item_name'],
+                $row['quantity'],
+                $row['unit'] ?? 'pcs',
+                $row['date'] . ' 00:00:00',
+                (int)$linkedStockOut['id']
+            ]);
+            continue;
+        }
+
+        // Otherwise attach this stock-out to its Sales request, if one exists.
+        $existingRequest = $salesDb->prepare("
+            SELECT id, request_status
+            FROM inventory_stockout_approvals
+            WHERE inventory_stock_out_id IS NULL
+              AND inventory_request_number = ?
+              AND product_code = ?
             ORDER BY id DESC
             LIMIT 1
         ");
-        $existing->execute([
-            (int)$row['id'],
-            $row['reference_number'] ?: null,
-            $row['item_code']
-        ]);
-        $local = $existing->fetch(PDO::FETCH_ASSOC);
-
+        $existingRequest->execute([$requestNumber, $row['item_code']]);
+        $local = $existingRequest->fetch(PDO::FETCH_ASSOC);
         if ($local) {
             $wasApproved = ($local['request_status'] ?? '') === 'Approved';
             if (!$wasApproved) {
@@ -1017,7 +933,7 @@ function syncInventoryStockouts(PDO $salesDb): int
                         reviewed_at = NOW(), remarks = CONCAT(COALESCE(remarks,''), ' Inventory System approved and stock-out completed; quantity added to Team Sales Inventory.')
                     WHERE id = ?
                 ")->execute([
-                    (int)$row['id'],
+                    $stockOutId,
                     $row['stock_out_number'],
                     $row['reference_number'] ?: null,
                     $row['reference_number'] ?: null,
@@ -1046,7 +962,7 @@ function syncInventoryStockouts(PDO $salesDb): int
         }
 
         $stmt->execute([
-            (int)$row['id'],
+            $stockOutId,
             $row['stock_out_number'],
             $row['reference_number'] ?: null,
             $row['item_code'],
@@ -1071,7 +987,7 @@ function syncInventoryStockouts(PDO $salesDb): int
             " )->execute([
                 $row['item_code'], $row['item_name'], $row['unit'] ?? 'pcs', (float)$row['quantity']
             ]);
-            $salesDb->prepare("UPDATE inventory_stockout_approvals SET request_status='Approved', reviewed_at=NOW(), remarks=CONCAT(COALESCE(remarks,''), ' Inventory System approved and stock-out completed; quantity added to Team Sales Inventory.') WHERE inventory_stock_out_id=?")->execute([(int)$row['id']]);
+            $salesDb->prepare("UPDATE inventory_stockout_approvals SET request_status='Approved', reviewed_at=NOW(), remarks=CONCAT(COALESCE(remarks,''), ' Inventory System approved and stock-out completed; quantity added to Team Sales Inventory.') WHERE inventory_stock_out_id=?")->execute([$stockOutId]);
         }
     }
 

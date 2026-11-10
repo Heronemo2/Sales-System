@@ -112,7 +112,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         | Insert quotation
                         |--------------------------------------------------------------------------
                         |
-                        | fg_id = inventory_system.finished_goods.fg_id
                         |
                         */
                         $ins = $pdo->prepare("
@@ -152,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $request['product_code'],
 
                             // Inventory finished_goods.id
-                            (int)($stock['fg_id'] ?? 0),
+                            $stock['fg_id'] ?? null,
 
                             (int)$request['quantity'],
                             (int)$check['available'],
@@ -185,6 +184,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $qid,
                             $requestId
                         ]);
+
+                        notifySalesAdminsPendingApproval(
+                            $pdo,
+                            'quotation-pending:' . $qid,
+                            'Quotation awaiting approval',
+                            'Quotation ' . $quotationNo . ' for ' . $request['customer_name']
+                                . ' (' . $request['product_code'] . ' × ' . (int)$request['quantity'] . ') is awaiting review.',
+                            'sales_quotation_approval.php'
+                        );
 
                         $pdo->commit();
 
@@ -386,47 +394,29 @@ $st->execute($params);
 $rows = $st->fetchAll();
 
 
-/*
-|--------------------------------------------------------------------------
-| CUSTOMER ORDER REQUESTS WAITING FOR QUOTATION
-|--------------------------------------------------------------------------
-|
-| IMPORTANT:
-| customer_order_requests uses product_code
-|
-| Inventory database:
-| inventory_system.finished_goods
-|
-| Inventory column:
-| item_code
-|
-|--------------------------------------------------------------------------
-*/
-
 $requests = $pdo->query("
     SELECT
         r.*,
-        c.customer_name,
-
-        (
-            SELECT item_name
-            FROM inventory_system.finished_goods ip
-            WHERE
-                ip.item_code COLLATE utf8mb4_unicode_ci
-                =
-                r.product_code COLLATE utf8mb4_unicode_ci
-            LIMIT 1
-        ) AS product_name
-
+        c.customer_name
     FROM customer_order_requests r
-
     JOIN customers c
         ON c.cus_id = r.customer_id
-
     WHERE r.status = 'Pending Quotation'
-
     ORDER BY r.req_id DESC
 ")->fetchAll();
+
+try {
+    $productNames = [];
+    foreach (getInventoryFinishedGoods() as $product) {
+        $productNames[(string)$product['item_code']] = (string)$product['item_name'];
+    }
+    foreach ($requests as &$request) {
+        $request['product_name'] = $productNames[(string)$request['product_code']] ?? '';
+    }
+    unset($request);
+} catch (Throwable $e) {
+    $error = 'Could not load product names from Inventory API: ' . $e->getMessage();
+}
 
 ?>
 

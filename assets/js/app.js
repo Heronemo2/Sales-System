@@ -101,6 +101,133 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Sales Admin and Sales Staff notifications.
+    const notificationButton = document.getElementById('notificationButton');
+    const notificationDropdown = document.getElementById('notificationDropdown');
+    const notificationList = document.getElementById('notificationList');
+    const notificationBadge = document.getElementById('notificationBadge');
+    const markAllNotificationsRead = document.getElementById('markAllNotificationsRead');
+    if (notificationButton && notificationDropdown && notificationList && notificationBadge) {
+        const csrfToken = notificationButton.dataset.csrfToken || '';
+        let notificationRefreshInProgress = false;
+        const updateBadge = (count) => {
+            const unreadCount = Number(count) || 0;
+            notificationBadge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+            notificationBadge.hidden = unreadCount === 0;
+            notificationButton.setAttribute(
+                'aria-label',
+                unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
+            );
+        };
+        const showNotificationError = (message) => {
+            notificationList.replaceChildren();
+            const error = document.createElement('p');
+            error.className = 'notification-empty notification-error';
+            error.textContent = message;
+            notificationList.append(error);
+        };
+        const sendNotificationAction = async (payload) => {
+            const response = await fetch('notifications.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Could not update notifications.');
+            }
+        };
+        const refreshNotifications = async () => {
+            if (notificationRefreshInProgress) return;
+            notificationRefreshInProgress = true;
+            try {
+                const response = await fetch('notifications.php', {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const result = await response.json();
+                if (!response.ok || !result.success || !result.data) {
+                    throw new Error(result.message || 'Could not load notifications.');
+                }
+
+                updateBadge(result.data.unread_count);
+                notificationList.replaceChildren();
+                if (!Array.isArray(result.data.notifications) || result.data.notifications.length === 0) {
+                    const empty = document.createElement('p');
+                    empty.className = 'notification-empty';
+                    empty.textContent = 'No notifications yet.';
+                    notificationList.append(empty);
+                    return;
+                }
+
+                result.data.notifications.forEach((notification) => {
+                    const link = document.createElement('a');
+                    link.className = `notification-item${notification.read_at ? '' : ' unread'}`;
+                    link.href = notification.link || 'quotations.php';
+                    link.dataset.notificationId = String(notification.notification_id);
+                    const title = document.createElement('strong');
+                    title.textContent = notification.title;
+                    const message = document.createElement('span');
+                    message.textContent = notification.message;
+                    const date = document.createElement('time');
+                    date.textContent = notification.created_at;
+                    link.append(title, message, date);
+                    notificationList.append(link);
+                });
+            } catch (error) {
+                console.error('Sales notifications could not be refreshed:', error);
+                showNotificationError('Notifications could not be refreshed. Please try again.');
+            } finally {
+                notificationRefreshInProgress = false;
+            }
+        };
+
+        notificationButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const isOpen = notificationDropdown.classList.toggle('open');
+            notificationButton.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            if (isOpen) refreshNotifications();
+        });
+        document.addEventListener('click', (event) => {
+            if (!notificationDropdown.contains(event.target) && !notificationButton.contains(event.target)) {
+                notificationDropdown.classList.remove('open');
+                notificationButton.setAttribute('aria-expanded', 'false');
+            }
+        });
+        notificationList.addEventListener('click', async (event) => {
+            const link = event.target.closest('a[data-notification-id]');
+            if (!link) return;
+            event.preventDefault();
+            try {
+                await sendNotificationAction({
+                    action: 'mark_read',
+                    notification_id: Number(link.dataset.notificationId)
+                });
+            } catch (error) {
+                console.error('Sales notification could not be marked as read:', error);
+            }
+            window.location.assign(link.href);
+        });
+        markAllNotificationsRead?.addEventListener('click', async () => {
+            try {
+                await sendNotificationAction({ action: 'mark_all_read' });
+                await refreshNotifications();
+            } catch (error) {
+                console.error('Sales notifications could not be marked as read:', error);
+                showNotificationError('Notifications could not be marked as read.');
+            }
+        });
+
+        refreshNotifications();
+        window.setInterval(() => {
+            if (!document.hidden) refreshNotifications();
+        }, 60000);
+    }
+
     // Manage Profile modal
     const profileModal = document.getElementById('profileModal');
     const openProfileModal = document.getElementById('openProfileModal');

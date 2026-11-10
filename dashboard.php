@@ -42,6 +42,7 @@ $ordersStmt->bindValue(':limit', $ordersPerPage, PDO::PARAM_INT);
 $ordersStmt->bindValue(':offset', ($progressPage - 1) * $ordersPerPage, PDO::PARAM_INT);
 $ordersStmt->execute();
 $orders = $ordersStmt->fetchAll();
+$isSalesAdminDashboard = (currentUser()['role'] ?? '') === 'Sales Admin';
 function orderProgressPageUrl(int $page): string
 {
     return '?' . http_build_query(['progress_page' => $page]);
@@ -57,21 +58,21 @@ function orderProgress(array $o): array
     if (($o['delivery_status'] ?? '') === 'Preparing' || $status === 'Processing') return [45, 'Processing'];
     return [25, 'Pending'];
 }
-$pageTitle = 'Sales Dashboard';
+$pageTitle = $isSalesAdminDashboard ? 'Sales Admin Dashboard' : 'Sales Dashboard';
 include __DIR__ . '/includes/header.php';
 ?>
 <section class="welcome-banner">
     <div>
-        <p class="eyebrow light">SALES MANAGEMENT</p>
-        <h2>Track every order from quotation to collection.</h2>
-        <p>Customer requests, quotations, purchase orders, delivery, invoicing, and payment in one flow.</p>
+        <p class="eyebrow light"><?= $isSalesAdminDashboard ? 'SALES ADMINISTRATION' : 'SALES MANAGEMENT' ?></p>
+        <h2><?= $isSalesAdminDashboard ? 'Oversee approvals, team activity, and sales operations.' : 'Track every order from quotation to collection.' ?></h2>
+        <p><?= $isSalesAdminDashboard ? 'Monitor user actions, customer requests, orders, and Inventory stock requests.' : 'Customer requests, quotations, purchase orders, delivery, invoicing, and payment in one flow.' ?></p>
     </div>
     <div class="banner-mark">S</div>
 </section>
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-icon red">Q</div>
-        <div><span>Quotation Approval</span><strong><?= $openQuotations ?></strong><small>Waiting for Sales Admin</small></div>
+        <div><span>Quotation Approval</span><strong><?= $openQuotations ?></strong><small><?= $isSalesAdminDashboard ? 'Awaiting your review' : 'Waiting for Sales Admin' ?></small></div>
     </div>
     <div class="stat-card">
         <div class="stat-icon pink">R</div>

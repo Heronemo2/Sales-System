@@ -20,12 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$po) {
             $error = 'Purchase Order not found or already converted.';
         } else {
-            // Check live stock at PO conversion time. If insufficient, keep the PO open.
+            // Validate that the product is active; Sales stock is checked at order approval.
             $stockCheck = checkInventoryProduct((string)$po['product_code']);
-            if (empty($stockCheck['ok'])) {
+            if (empty($stockCheck['ok']) || ($stockCheck['status'] ?? '') !== 'Active') {
                 $error = $stockCheck['error'] ?? 'Could not check Inventory. Purchase Order remains open.';
-            } elseif ((float)($stockCheck['quantity'] ?? 0) < (float)$po['quantity']) {
-                $error = 'Insufficient Inventory for ' . $po['product_code'] . '. Available: ' . number_format((float)$stockCheck['quantity'], 2) . ', required: ' . number_format((float)$po['quantity'], 2) . '. Purchase Order remains open until stock is available.';
             } else {
             $orderNo = nextDocNo($pdo, 'sales_orders', 'SO-', 1000);
             $pay = $pdo->prepare("SELECT payment_method,payment_status,payment_reference,paid_at,receipt_no FROM sales_quotations WHERE sq_id=?");
@@ -36,10 +34,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $pdo->beginTransaction();
             try {
-                $pdo->prepare("INSERT INTO sales_orders
+                $insertOrder = $pdo->prepare("INSERT INTO sales_orders
                     (order_no, quotation_id, customer_id, order_date, product_code, quantity, total_amount, status, admin_status, payment_method, payment_status, payment_reference, paid_at, receipt_no)
-                    VALUES (?,?,?,?,?,?,?,'Pending','Pending',?,?,?,?,?)")
-                    ->execute([
+                    VALUES (?,?,?,?,?,?,?,'Pending','Pending',?,?,?,?,?)");
+                $insertOrder->execute([
                         $orderNo,
                         $po['quotation_id'],
                         $po['customer_id'],
@@ -53,6 +51,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $payment['paid_at'],
                         $payment['receipt_no']
                     ]);
+                $orderId = (int)$pdo->lastInsertId();
+                $customerStmt = $pdo->prepare('SELECT customer_name FROM customers WHERE cus_id = ? LIMIT 1');
+                $customerStmt->execute([(int)$po['customer_id']]);
+                $customerName = (string)($customerStmt->fetchColumn() ?: 'Customer');
+                notifySalesAdminsPendingApproval(
+                    $pdo,
+                    'sales-order-pending:' . $orderId,
+                    'Sales order awaiting approval',
+                    'Sales Order ' . $orderNo . ' for ' . $customerName . ' (' . $po['product_code'] . ' × ' . (int)$po['quantity'] . ') is awaiting review.',
+                    'sales_order_approval.php'
+                );
                 $pdo->prepare("UPDATE purchase_orders SET status='Converted', converted_order_no=?, converted_at=NOW() WHERE po_id=?")
                     ->execute([$orderNo, $poId]);
                 $pdo->commit();

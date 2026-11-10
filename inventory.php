@@ -11,6 +11,12 @@ $rows = [];
 $error = '';
 
 try {
+    syncInventoryStockouts($pdo);
+} catch (Throwable $e) {
+    $error = 'Could not sync stock-outs from Inventory System: ' . $e->getMessage();
+}
+
+try {
     $rows = $pdo->query("
         SELECT inventory_id, product_code, product_name, brand, size, unit,
                stock_quantity, reorder_level, status, last_updated
@@ -19,7 +25,30 @@ try {
         ORDER BY product_name ASC
     ")->fetchAll();
 } catch (Throwable $e) {
-    $error = $e->getMessage();
+    $error = $error !== ''
+        ? $error . ' ' . $e->getMessage()
+        : $e->getMessage();
+}
+
+if ($rows) {
+    try {
+        $catalogByCode = [];
+        foreach (getInventoryFinishedGoods() as $product) {
+            $catalogByCode[(string)$product['item_code']] = $product;
+        }
+        foreach ($rows as &$row) {
+            $productCode = (string)$row['product_code'];
+            if (isset($catalogByCode[$productCode])) {
+                $row['brand'] = $catalogByCode[$productCode]['brand'] ?? '';
+                $row['size'] = $catalogByCode[$productCode]['size'] ?? '';
+                $row['reorder_level'] = $catalogByCode[$productCode]['reorder_level'] ?? 0;
+            }
+        }
+        unset($row);
+    } catch (Throwable $e) {
+        $catalogError = 'Could not load product details from Inventory System API: ' . $e->getMessage();
+        $error = $error !== '' ? $error . ' ' . $catalogError : $catalogError;
+    }
 }
 
 include __DIR__ . '/includes/header.php';
@@ -35,7 +64,7 @@ include __DIR__ . '/includes/header.php';
                 <p class="eyebrow">TEAM SALES INVENTORY</p>
                 <h2 style="margin:0;">Inventory</h2>
                 <p style="color:var(--muted);margin:5px 0 0;">
-                    This is the stock currently held by Team Sales. Stock is added only after an Inventory System stock-out is approved here.
+                    Brand, size, and reorder level are referenced from Inventory System finished goods. Stock shown here is held by Team Sales and updated after an Inventory System stock-out is approved.
                 </p>
             </div>
         </div>

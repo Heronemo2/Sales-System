@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'quotati
                 $request = createTeamSalesStockoutRequest(
                     $pdo,
                     (string)$quotation['product_code'],
-                    $missing,
+                    $required,
                     (string)$quotation['quotation_no']
                 );
                 $pdo->prepare("

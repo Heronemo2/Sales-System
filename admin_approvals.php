@@ -166,8 +166,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Quotation was not found or is no longer pending.');
             }
 
-            if ($productCode === '' || $quantity <= 0) {
-                throw new RuntimeException('Select a product and enter a valid quantity.');
+            if ($productCode === '' || $quantity <= 0 || floor($quantity) !== $quantity) {
+                throw new RuntimeException('Select a product and enter a positive whole-number quantity.');
             }
 
             if ((string)$quotation['product_code'] !== $productCode) {
@@ -183,9 +183,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Team Sales Inventory already has enough stock. You can approve the quotation.');
             }
 
-            if ($quantity < $missing) {
+            if ($quantity < $required) {
                 throw new RuntimeException(
-                    'The requested quantity must be at least ' . rtrim(rtrim(number_format($missing, 2, '.', ''), '0'), '.') . '.'
+                    'The requested quantity must be at least the quotation quantity of ' . rtrim(rtrim(number_format($required, 2, '.', ''), '0'), '.') . '.'
                 );
             }
 
@@ -255,8 +255,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $quantity = (float)($_POST['quantity'] ?? 0);
             $remarks = trim($_POST['remarks'] ?? '');
 
-            if ($productCode === '' || $selectedSize === '' || $quantity <= 0) {
-                throw new RuntimeException('Select a finished good and size, then enter a valid quantity.');
+            if ($productCode === '' || $selectedSize === '' || $quantity <= 0 || floor($quantity) !== $quantity) {
+                throw new RuntimeException('Select a finished good and size, then enter a positive whole-number quantity.');
             }
 
             $result = createTeamSalesStockoutRequest(
@@ -319,7 +319,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = createTeamSalesStockoutRequest(
                 $pdo,
                 (string)$quotation['product_code'],
-                $missing,
+                $required,
                 (string)$quotation['quotation_no']
             );
 
@@ -374,11 +374,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $required = (float)($orderRow['quantity'] ?? 0);
 
                 if (!$localStock || $available < $required) {
-                    $missing = max(0, $required - $available);
                     $requestResult = createTeamSalesStockoutRequest(
                         $pdo,
                         (string)($orderRow['product_code'] ?? ''),
-                        $missing,
+                        $required,
                         (string)($orderRow['order_no'] ?? 'Sales Order')
                     );
 
@@ -545,23 +544,10 @@ $returns = $pdo->query("
 
 $stockRequestProducts = [];
 try {
-    require_once __DIR__ . '/config/inventory_db.php';
-    $inventoryDb = getInventoryDB();
-    $stockRequestProducts = $inventoryDb->query("
-        SELECT DISTINCT i.item_code, i.item_name, i.size, i.unit
-        FROM items i
-        INNER JOIN finished_goods fg
-            ON fg.item_code = i.item_code
-        WHERE i.item_type = 'Finished Good'
-          AND i.status = 'Active'
-          AND fg.status = 'Active'
-          AND i.item_code IS NOT NULL
-          AND i.item_code <> ''
-        ORDER BY i.item_name ASC, i.size ASC, i.item_code ASC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    $stockRequestProducts = getInventoryFinishedGoods();
 } catch (Throwable $e) {
     if ($error === '') {
-        $error = 'Could not load Inventory products: ' . $e->getMessage();
+        $error = 'Could not load Inventory products from the API: ' . $e->getMessage();
     }
 }
 
@@ -795,7 +781,7 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
                                 data-quotation-id="<?= (int)$q['sq_id'] ?>"
                                 data-product-code="<?= htmlspecialchars((string)$q['product_code'], ENT_QUOTES) ?>"
                                 data-product-name="<?= htmlspecialchars((string)($q['product_code'] . ' — ' . ($q['product_name'] ?? '')), ENT_QUOTES) ?>"
-                                data-quantity="<?= htmlspecialchars((string)max(0, (float)$q['quantity'] - (float)$q['live_inventory_quantity']), ENT_QUOTES) ?>"
+                                data-quantity="<?= htmlspecialchars((string)(float)$q['quantity'], ENT_QUOTES) ?>"
                                 data-reference="<?= htmlspecialchars((string)$q['quotation_no'], ENT_QUOTES) ?>"
                                 onclick="openStockRequestModal(this)"
                             >
@@ -1065,7 +1051,7 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
                             $seenProducts[$key] = true;
                         ?>
                             <option value="<?= htmlspecialchars($p['item_code'], ENT_QUOTES) ?>">
-                                <?= htmlspecialchars($p['item_code'] . ' — ' . $p['item_name']) ?>
+                                <?= htmlspecialchars($p['item_code'] . ' — ' . $p['item_name'] . (($p['brand'] ?? '') !== '' ? ' · ' . $p['brand'] : '')) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -1081,7 +1067,7 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
 
             <label>
                 <span>Quantity</span>
-                <input type="number" name="quantity" min="0.01" step="0.01" required placeholder="0">
+                <input type="number" name="quantity" min="1" step="1" required placeholder="0">
             </label>
 
             <label>
@@ -1105,7 +1091,7 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
             <div>
                 <p class="eyebrow dark" style="margin-bottom:6px;">REQUEST STOCKOUT</p>
                 <h2 id="stockRequestTitle" style="margin:0;">Request Stock from Inventory</h2>
-                <p class="muted" style="margin:6px 0 0;">Send the missing quantity to the Inventory System for approval and stock-out.</p>
+                <p class="muted" style="margin:6px 0 0;">Request the full quotation quantity from the Inventory System for approval and stock-out.</p>
             </div>
             <button type="button" class="stock-request-close" onclick="closeStockRequestModal()" aria-label="Close">&times;</button>
         </div>
@@ -1127,8 +1113,8 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
 
                 <label>
                     <span>Quantity to Request</span>
-                    <input type="number" name="quantity" id="stockRequestQuantity" min="0.01" step="0.01" required>
-                    <small id="stockRequestQuantityHint">Minimum required quantity: —</small>
+                    <input type="number" name="quantity" id="stockRequestQuantity" min="1" step="1" required>
+                    <small id="stockRequestQuantityHint">Minimum quotation quantity: —</small>
                 </label>
             </div>
 
@@ -1184,7 +1170,7 @@ function openStockRequestModal(button){
     document.getElementById('stockRequestProductName').textContent=button.dataset.productName||button.dataset.productCode||'—';
     document.getElementById('stockRequestQuantity').value=button.dataset.quantity||'';
     document.getElementById('stockRequestQuantity').min=button.dataset.quantity||'0.01';
-    document.getElementById('stockRequestQuantityHint').textContent='Minimum required quantity: '+(button.dataset.quantity||'0');
+    document.getElementById('stockRequestQuantityHint').textContent='Minimum quotation quantity: '+(button.dataset.quantity||'0');
     document.getElementById('stockRequestReference').value=button.dataset.reference||'';
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden','false');

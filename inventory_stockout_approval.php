@@ -14,22 +14,9 @@ $notice = !empty($_GET['request_number'])
 $stockRequestProducts = [];
 
 try {
-    require_once __DIR__ . '/config/inventory_db.php';
-    $inventoryDb = getInventoryDB();
-    $stockRequestProducts = $inventoryDb->query("
-        SELECT DISTINCT i.item_code, i.item_name, i.size, i.unit
-        FROM items i
-        INNER JOIN finished_goods fg
-            ON fg.item_code = i.item_code
-        WHERE i.item_type = 'Finished Good'
-          AND i.status = 'Active'
-          AND fg.status = 'Active'
-          AND i.item_code IS NOT NULL
-          AND i.item_code <> ''
-        ORDER BY i.item_name ASC, i.size ASC, i.item_code ASC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    $stockRequestProducts = getInventoryFinishedGoods();
 } catch (Throwable $e) {
-    $error = 'Could not load active finished goods from Inventory: ' . $e->getMessage();
+    $error = 'Could not load active finished goods from Inventory API: ' . $e->getMessage();
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'specific_stock_request') {
@@ -39,8 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'specifi
     $quantity = filter_var($_POST['quantity'] ?? null, FILTER_VALIDATE_FLOAT);
     $remarks = trim((string)($_POST['remarks'] ?? ''));
 
-    if ($productCode === '' || $selectedSize === '' || $quantity === false || $quantity <= 0) {
-        $error = 'Select a finished good and size, then enter a quantity greater than zero.';
+    if ($productCode === '' || $selectedSize === '' || $quantity === false || $quantity <= 0 || floor((float)$quantity) !== (float)$quantity) {
+        $error = 'Select a finished good and size, then enter a positive whole-number quantity.';
     } else {
         try {
             $result = createTeamSalesStockoutRequest(
@@ -86,10 +73,6 @@ $stockouts = $pdo->query("
     SELECT *
     FROM inventory_stockout_approvals isa
     WHERE isa.destination = 'Sales'
-      AND (
-            isa.inventory_request_number LIKE 'REQ-SALES-%'
-            OR isa.source_reference LIKE 'REQ-SALES-%'
-          )
       /* Once Inventory has actually created a stock-out for the same
          Sales product/quantity, hide the old local Requested row.
          The Stocked Out row becomes the only row Sales needs to approve. */
@@ -123,7 +106,6 @@ $pendingApprovalCount = (int)$pdo->query("
     SELECT COUNT(*)
     FROM inventory_stockout_approvals
     WHERE destination = 'Sales'
-      AND (inventory_request_number LIKE 'REQ-SALES-%' OR source_reference LIKE 'REQ-SALES-%')
       AND request_status = 'Stocked Out'
 ")->fetchColumn();
 
@@ -131,7 +113,6 @@ $requestedCount = (int)$pdo->query("
     SELECT COUNT(*)
     FROM inventory_stockout_approvals isa
     WHERE isa.destination = 'Sales'
-      AND (isa.inventory_request_number LIKE 'REQ-SALES-%' OR isa.source_reference LIKE 'REQ-SALES-%')
       AND isa.request_status = 'Requested'
       AND NOT EXISTS (
           SELECT 1
@@ -149,7 +130,6 @@ $inventoryApprovedCount = (int)$pdo->query("
     SELECT COUNT(*)
     FROM inventory_stockout_approvals
     WHERE destination = 'Sales'
-      AND (inventory_request_number LIKE 'REQ-SALES-%' OR source_reference LIKE 'REQ-SALES-%')
       AND request_status = 'Inventory Approved'
 ")->fetchColumn();
 $requestGroups = [
@@ -230,7 +210,7 @@ include __DIR__ . '/includes/header.php';
                             $seenProducts[$productCode] = true;
                         ?>
                             <option value="<?= htmlspecialchars($productCode, ENT_QUOTES, 'UTF-8') ?>">
-                                <?= htmlspecialchars($productCode . ' — ' . $product['item_name'], ENT_QUOTES, 'UTF-8') ?>
+                                <?= htmlspecialchars($productCode . ' — ' . $product['item_name'] . (($product['brand'] ?? '') !== '' ? ' · ' . $product['brand'] : ''), ENT_QUOTES, 'UTF-8') ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -243,7 +223,7 @@ include __DIR__ . '/includes/header.php';
                 </label>
                 <label>
                     <span>Quantity</span>
-                    <input type="number" name="quantity" min="0.01" step="0.01" required>
+                    <input type="number" name="quantity" min="1" step="1" required>
                 </label>
                 <label>
                     <span>Remarks (optional)</span>

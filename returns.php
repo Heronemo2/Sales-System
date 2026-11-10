@@ -17,10 +17,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $returnNo = nextDocNo($pdo, 'sales_returns', 'RET-', 0, 3);
         $stmt = $pdo->prepare("INSERT INTO sales_returns (return_no, order_id, return_date, reason, total_amount, status) VALUES (?,?,?,?,?,'Pending')");
-        $stmt->execute([$returnNo, $orderId, $date, $reason, $total]);
-        logActivity($pdo, 'Create', 'Sales Return', 'Created ' . $returnNo, (int)$pdo->lastInsertId());
-        header('Location: returns.php?section=core&added=1');
-        exit;
+        try {
+            $pdo->beginTransaction();
+            $stmt->execute([$returnNo, $orderId, $date, $reason, $total]);
+            $returnId = (int)$pdo->lastInsertId();
+            notifySalesAdminsPendingApproval(
+                $pdo,
+                'sales-return-pending:' . $returnId,
+                'Sales return awaiting approval',
+                'Sales Return ' . $returnNo . ' is awaiting review.',
+                'sales_return_approval.php'
+            );
+            $pdo->commit();
+            logActivity($pdo, 'Create', 'Sales Return', 'Created ' . $returnNo, $returnId);
+            header('Location: returns.php?section=core&added=1');
+            exit;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $error = 'Could not submit the sales return: ' . $e->getMessage();
+        }
     }
 }
 

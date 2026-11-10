@@ -27,8 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'order')
                 $available = (float)($localStock['stock_quantity'] ?? 0);
                 $required = (float)($orderRow['quantity'] ?? 0);
                 if (!$localStock || $available < $required || (($localStock['status'] ?? 'Active') !== 'Active')) {
-                    $missing = max(0, $required - $available);
-                    $requestResult = createTeamSalesStockoutRequest($pdo, (string)($orderRow['product_code'] ?? ''), $missing, (string)($orderRow['order_no'] ?? 'Sales Order'));
+                    $requestResult = createTeamSalesStockoutRequest($pdo, (string)($orderRow['product_code'] ?? ''), $required, (string)($orderRow['order_no'] ?? 'Sales Order'));
                     throw new RuntimeException(($requestResult['message'] ?? 'Inventory stock-out request sent.') . ' The Sales Order remains pending until the stock-out is approved in Team Sales.');
                 }
                 $delivery = convertOrderToDelivery($pdo, $id);

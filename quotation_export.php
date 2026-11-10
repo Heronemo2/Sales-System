@@ -15,19 +15,19 @@ $st=$pdo->prepare("
         c.address,
         c.city,
         c.province,
-        fg.item_name AS product_name,
-        fg.item_code,
-        fg.unit
+        q.product_code
     FROM sales_quotations q
     JOIN customers c 
         ON c.cus_id = q.customer_id
-    LEFT JOIN inventory_system.finished_goods fg
-        ON fg.fg_id = q.fg_id
     WHERE q.sq_id = ?
     LIMIT 1
 ");
 $st->execute([$id]); $q=$st->fetch();
 if(!$q){http_response_code(404);exit('Quotation not found.');}
+$inventoryProduct = checkInventoryProduct((string)$q['product_code']);
+$q['product_name'] = !empty($inventoryProduct['ok'])
+    ? (string)$inventoryProduct['item_name']
+    : (string)$q['product_code'];
 $user=currentUser();
 if(($user['role']??'')==='Customer' && (int)($user['customer_id']??0)!==(int)$q['customer_id']){http_response_code(403);exit('Forbidden.');}
 $pdf=new SimplePDF();
