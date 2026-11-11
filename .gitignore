@@ -1,5 +1,5 @@
 config/database.php
-config/inventory_db.php
+config/inventory_api.php
 assets/uploads/avatars/*
 assets/uploads/products/*
 !assets/uploads/products/.gitkeep
