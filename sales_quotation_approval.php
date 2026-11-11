@@ -164,7 +164,7 @@ include __DIR__ . '/includes/header.php';
                         <td><?= htmlspecialchars($row['product_code']) ?></td>
                         <td><?= (int)$row['quantity'] ?></td>
                         <td>
-                            <?= number_format($row['available_stock'], 2) ?> available
+                            <?= number_format($row['available_stock'], 0) ?> available
                             <?php if (!$row['has_enough_stock']): ?>
                                 <span class="badge warning">Insufficient</span>
                             <?php endif; ?>

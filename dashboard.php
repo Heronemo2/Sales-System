@@ -10,7 +10,7 @@ $requests = (int)$pdo->query("SELECT COUNT(*) FROM customer_order_requests WHERE
 $ordersInProgress = (int)$pdo->query("SELECT COUNT(*) FROM sales_orders WHERE status IN('Pending','Processing','Invoiced')")->fetchColumn();
 $stockoutApprovals = (int)$pdo->query("SELECT COUNT(*) FROM inventory_stockout_approvals WHERE request_status='Stocked Out'")->fetchColumn();
 $teamSalesStock = (float)$pdo->query("SELECT COALESCE(SUM(stock_quantity),0) FROM inventory WHERE status='Active'")->fetchColumn();
-$receivablesDue = (float)$pdo->query("SELECT COALESCE(SUM(total_amount-amount_paid),0) FROM sales_invoices WHERE status!='Paid'")->fetchColumn();
+$receivablesDue = (float)$pdo->query("SELECT COALESCE(SUM(GREATEST(total_amount-amount_paid,0)),0) FROM sales_invoices WHERE status NOT IN ('Paid','Returned')")->fetchColumn();
 $monthStart = date('Y-m-01');
 $nextMonthStart = date('Y-m-01', strtotime('first day of next month'));
 $kpiStmt = $pdo->prepare("

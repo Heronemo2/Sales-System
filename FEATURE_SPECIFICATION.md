@@ -85,10 +85,10 @@ This specification describes functionality visible in the current repository. It
 
 - **Purpose:** Prepare and track customer price quotations.
 - **Actors:** Sales Staff; Sales Admin reviews quotations; a customer decision is represented in the workflow.
-- **Inputs:** Source request, quotation date, validity date, unit price, product, and requested quantity.
-- **Behavior:** Create a quotation from a pending request, calculate the total, check stock/product details through the Inventory integration, save the Inventory check result, and track approval statuses. Quotations can be exported.
-- **Rules:** Unit price must be greater than zero; totals must be valid; a request cannot be quoted again once processed. Sales stock is considered when determining whether a quotation can proceed.
-- **Acceptance criteria:** A valid request creates one numbered quotation with the correct total and linked customer/request; invalid price or stock-check errors are reported without creating a valid quotation.
+- **Inputs:** Source request, quotation date, validity date, product, and requested quantity. The fixed unit price comes from Team Sales inventory.
+- **Behavior:** Create a quotation from a pending request, calculate the total from the inventory price, check stock/product details through the Inventory integration, save the Inventory check result, and track approval statuses. Quotations can be exported.
+- **Rules:** A fixed inventory price must be greater than zero; Sales Staff cannot override it in a quotation; totals must be valid; a request cannot be quoted again once processed. Sales stock is considered when determining whether a quotation can proceed.
+- **Acceptance criteria:** A valid request creates one numbered quotation using the fixed inventory price and links it to the customer/request; missing price or stock-check errors are reported without creating a quotation.
 - **Implementation/data:** [quotations.php](./quotations.php), [quotation_export.php](./quotation_export.php), `sales_quotations`, `customer_order_requests`, Inventory System product/stock data.
 
 ### 4.6 Sales Admin approvals

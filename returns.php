@@ -12,8 +12,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $date = $_POST['return_date'] ?? '';
     $total = (float) ($_POST['total_amount'] ?? 0);
 
-    if (!$orderId || !$date || $reason === '') {
-        $error = 'Order, reason, and return date are required.';
+    if (!$orderId || !$date || $reason === '' || $total <= 0) {
+        $error = 'Order, reason, return date, and a return amount greater than 0 are required.';
     } else {
         $returnNo = nextDocNo($pdo, 'sales_returns', 'RET-', 0, 3);
         $stmt = $pdo->prepare("INSERT INTO sales_returns (return_no, order_id, return_date, reason, total_amount, status) VALUES (?,?,?,?,?,'Pending')");
@@ -45,7 +45,7 @@ $pageTitle = 'Sales Returns';
 include __DIR__ . '/includes/header.php';
 
 $search=trim($_GET['search']??''); $sql='SELECT r.*, o.order_no, c.customer_name AS customer_name FROM sales_returns r JOIN sales_orders o ON o.so_id=r.order_id JOIN customers c ON c.cus_id=o.customer_id'; $params=[]; if($search!==''){ $sql.=' WHERE r.return_no LIKE ? OR o.order_no LIKE ? OR c.customer_name LIKE ? OR r.reason LIKE ? OR r.status LIKE ?'; $like='%'.$search.'%'; $params=[$like,$like,$like,$like,$like]; } $sql.=' ORDER BY r.ret_id DESC'; $st=$pdo->prepare($sql); $st->execute($params); $rows=$st->fetchAll();
-$orders = $pdo->query('SELECT o.so_id, o.order_no, c.customer_name AS customer_name FROM sales_orders o JOIN customers c ON c.cus_id = o.customer_id ORDER BY o.so_id DESC')->fetchAll();
+$orders = $pdo->query('SELECT o.so_id, o.order_no, c.customer_name AS customer_name FROM sales_orders o JOIN sales_invoices i ON i.order_id=o.so_id JOIN customers c ON c.cus_id = o.customer_id ORDER BY o.so_id DESC')->fetchAll();
 ?>
 <div class="page-toolbar"><p class="muted" style="color: white;">Record and review products returned after a sale.</p><button class="primary-btn" data-open-modal="addReturnModal">+ New Sales Return</button></div>
 <div class="module-search"><form method="GET"><input type="hidden" name="section" value="core"><input type="search" name="search" value="<?= htmlspecialchars($search) ?>" placeholder="Search returns, orders, customers, reason, or status..."><button class="secondary-btn" type="submit">Search</button><?php if($search!==''): ?><a class="text-link" href="returns.php?section=core">Clear</a><?php endif; ?></form></div>
@@ -85,8 +85,8 @@ $orders = $pdo->query('SELECT o.so_id, o.order_no, c.customer_name AS customer_n
             <label>Return Date
                 <input type="date" name="return_date" value="<?= date('Y-m-d') ?>" required>
             </label>
-            <label>Return Amount (₱, optional)
-                <input type="number" step="0.01" min="0" name="total_amount" value="0">
+            <label>Return Amount (PHP)
+                <input type="number" step="0.01" min="0.01" name="total_amount" required>
             </label>
             <div class="modal-actions">
                 <button type="button" class="secondary-btn" data-close-modal>Cancel</button>

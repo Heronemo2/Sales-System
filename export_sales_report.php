@@ -19,7 +19,7 @@ $conversion = $quotes ? round($orders / $quotes * 100) : 0;
 $monthly = $pdo->prepare("SELECT MONTH(invoice_date) m, COALESCE(SUM(total_amount),0) total FROM sales_invoices WHERE YEAR(invoice_date)=? GROUP BY MONTH(invoice_date) ORDER BY m");
 $monthly->execute([$year]);
 $monthlyRows = $monthly->fetchAll();
-$customers = $pdo->prepare("SELECT c.customer_name,COUNT(DISTINCT o.so_id) orders_count,COALESCE(SUM(i.total_amount),0) revenue,COALESCE(SUM(i.total_amount-i.amount_paid),0) outstanding FROM customers c JOIN sales_orders o ON o.customer_id=c.cus_id LEFT JOIN sales_invoices i ON i.order_id=o.so_id WHERE YEAR(o.order_date)=? GROUP BY c.cus_id,c.customer_name ORDER BY revenue DESC LIMIT 10");
+$customers = $pdo->prepare("SELECT c.customer_name,COUNT(DISTINCT o.so_id) orders_count,COALESCE(SUM(i.total_amount),0) revenue,COALESCE(SUM(GREATEST(i.total_amount-i.amount_paid,0)),0) outstanding FROM customers c JOIN sales_orders o ON o.customer_id=c.cus_id LEFT JOIN sales_invoices i ON i.order_id=o.so_id WHERE YEAR(o.order_date)=? GROUP BY c.cus_id,c.customer_name ORDER BY revenue DESC LIMIT 10");
 $customers->execute([$year]);
 $customerRows = $customers->fetchAll();
 $user = currentUser();

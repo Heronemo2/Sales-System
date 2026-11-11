@@ -87,12 +87,12 @@ $rows = $st->fetchAll();
 $openInvoices = $pdo->query("
     SELECT i.inv_id, i.invoice_no, i.invoice_date,
            DATE_ADD(i.invoice_date, INTERVAL 30 DAY) AS due_date,
-           (i.total_amount - i.amount_paid) AS balance,
+           GREATEST(i.total_amount - i.amount_paid,0) AS balance,
            c.customer_name AS customer_name
     FROM sales_invoices i
     JOIN sales_orders o ON o.so_id = i.order_id
     JOIN customers c ON c.cus_id = o.customer_id
-    WHERE i.status != 'Paid'
+    WHERE i.status NOT IN ('Paid','Returned')
     ORDER BY i.inv_id DESC
 ")->fetchAll();
 ?>

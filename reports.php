@@ -43,7 +43,7 @@ $maxMonthly = max(array_map(fn($m) => (float)$m['total'], $monthly) ?: [0]) ?: 1
 $customerPerformance = $pdo->query("
     SELECT c.cus_id, c.customer_name, COUNT(DISTINCT o.so_id) orders_count,
            COALESCE(SUM(i.total_amount),0) revenue,
-           COALESCE(SUM(i.total_amount-i.amount_paid),0) outstanding
+           COALESCE(SUM(GREATEST(i.total_amount-i.amount_paid,0)),0) outstanding
     FROM customers c
     JOIN sales_orders o ON o.customer_id=c.cus_id
     LEFT JOIN sales_invoices i ON i.order_id=o.so_id

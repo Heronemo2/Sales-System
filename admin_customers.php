@@ -137,7 +137,7 @@ $customers = $pdo->query("
             SELECT o.customer_id,
                    SUM(i.total_amount) AS total_billed,
                    SUM(i.amount_paid)  AS total_paid,
-                   SUM(i.total_amount - i.amount_paid) AS outstanding
+                   SUM(GREATEST(i.total_amount - i.amount_paid,0)) AS outstanding
               FROM sales_orders o
               JOIN sales_invoices i ON i.order_id = o.so_id
              GROUP BY o.customer_id
@@ -161,7 +161,6 @@ $statusMsg = ['activated' => 'Customer activated.', 'deactivated' => 'Customer d
     <?php if (!$customers): ?><tr class="empty-row"><td colspan="6">No customers yet. Add your first customer above.</td></tr><?php endif; ?>
     <?php foreach ($customers as $c):
         $isActive = $c['status'] === 'Active';
-        $creditLimit = (float) $c['credit_limit'];
     ?>
         <tr>
             <td><b><?= htmlspecialchars($c['customer_code']) ?></b></td>
@@ -178,9 +177,7 @@ $statusMsg = ['activated' => 'Customer activated.', 'deactivated' => 'Customer d
                         data-billed="<?= htmlspecialchars(peso((float) $c['total_billed']), ENT_QUOTES) ?>"
                         data-paid="<?= htmlspecialchars(peso((float) $c['total_paid']), ENT_QUOTES) ?>"
                         data-outstanding="<?= htmlspecialchars(peso((float) $c['outstanding']), ENT_QUOTES) ?>"
-                        data-outstanding-raw="<?= (float) $c['outstanding'] ?>"
-                        data-limit="<?= htmlspecialchars(peso($creditLimit), ENT_QUOTES) ?>"
-                        data-available="<?= htmlspecialchars(peso(max(0, $creditLimit - (float) $c['outstanding'])), ENT_QUOTES) ?>">Balance</button>
+                        data-outstanding-raw="<?= (float) $c['outstanding'] ?>">Balance</button>
                     <button type="button" class="table-action js-edit" data-open-modal="editCustomerModal"
                         data-id="<?= (int) $c['cus_id'] ?>"
                         data-name="<?= htmlspecialchars($c['customer_name'] ?? '', ENT_QUOTES) ?>"
@@ -273,8 +270,6 @@ $statusMsg = ['activated' => 'Customer activated.', 'deactivated' => 'Customer d
                 <tr><td>Total Billed</td><td style="text-align:right"><b id="balBilled"></b></td></tr>
                 <tr><td>Total Paid</td><td style="text-align:right"><b id="balPaid"></b></td></tr>
                 <tr><td>Outstanding Balance</td><td style="text-align:right"><span class="badge" id="balOutstanding"></span></td></tr>
-                <tr><td>Credit Limit</td><td style="text-align:right"><b id="balLimit"></b></td></tr>
-                <tr><td>Available Credit</td><td style="text-align:right"><b id="balAvailable"></b></td></tr>
             </tbody>
         </table>
         <div class="modal-actions">
@@ -324,8 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
             $('balanceTitle').textContent = d.name;
             $('balBilled').textContent = d.billed;
             $('balPaid').textContent = d.paid;
-            $('balLimit').textContent = d.limit;
-            $('balAvailable').textContent = d.available;
             const out = $('balOutstanding');
             out.textContent = d.outstanding;
             out.className = 'badge ' + (parseFloat(d.outstandingRaw) > 0 ? 'warning' : 'success');

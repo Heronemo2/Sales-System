@@ -65,7 +65,8 @@ $rows = $st->fetchAll();
                         <td><span class="badge <?= badgeClass($r['payment_status'] ?? 'Pending') ?>"><?= htmlspecialchars($r['payment_status'] ?? 'Pending') ?></span></td>
                         <td><span class="badge <?= badgeClass($r['admin_status']) ?>"><?= htmlspecialchars($r['admin_status']) ?></span></td>
                         <td class="order-action-cell">
-                            <?php if ($r['admin_status'] === 'Pending' && $r['status'] !== 'Cancelled'): ?>
+                            <?php if ($r['status'] === 'Returned'): ?>
+                            <?php elseif ($r['admin_status'] === 'Pending' && $r['status'] !== 'Cancelled'): ?>
                                 <small>Waiting for Sales Admin approval</small>
                             <?php elseif ($r['admin_status'] === 'Rejected'): ?>
                                 <small>Rejected by Sales Admin</small>

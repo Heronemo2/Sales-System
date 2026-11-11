@@ -90,7 +90,7 @@ function ensureSalesInvoiceForOrder(PDO $pdo, int $orderId): ?string
     $insert = $pdo->prepare("INSERT INTO sales_invoices (invoice_no, order_id, invoice_date, total_amount, amount_paid, status) VALUES (?, ?, CURDATE(), ?, ?, ?)");
     $insert->execute([$invoiceNo, $orderId, (float)($order['total_amount'] ?? 0), $paid, $status]);
 
-    $pdo->prepare("UPDATE sales_orders SET status = 'Invoiced', admin_status = 'Approved' WHERE so_id = ? AND status <> 'Cancelled'")->execute([$orderId]);
+    $pdo->prepare("UPDATE sales_orders SET status = 'Invoiced', admin_status = 'Approved' WHERE so_id = ? AND status NOT IN ('Cancelled', 'Returned')")->execute([$orderId]);
     syncSalesOrderCompletion($pdo, $orderId);
 
     return $invoiceNo;
@@ -144,7 +144,7 @@ function syncSalesOrderCompletion(PDO $pdo, int $orderId): void
                 payment_status = 'Paid',
                 paid_at = COALESCE(paid_at, NOW())
             WHERE so_id = ?
-              AND status <> 'Cancelled'
+              AND status NOT IN ('Cancelled', 'Returned')
         ")->execute([$orderId]);
     }
 }

@@ -21,7 +21,8 @@ $pdo = getDB();
 if ($type === 'invoice') {
     $stmt = $pdo->prepare("
         SELECT i.invoice_no, i.invoice_date, i.total_amount, i.amount_paid, i.status,
-               o.order_no, o.product_code, o.quantity,
+               o.order_no, o.product_code, o.quantity, o.total_amount AS order_total,
+               COALESCE((SELECT SUM(r.total_amount) FROM sales_returns r WHERE r.order_id=o.so_id AND r.admin_status='Approved'),0) AS approved_return_total,
                c.customer_name, c.customer_code, c.email, c.phone, c.address, c.city, c.province
         FROM sales_invoices i
         JOIN sales_orders o ON o.so_id = i.order_id
@@ -97,8 +98,8 @@ $address = trim(implode(', ', array_filter([
 ])));
 $pdf->text(48, 175, 'CUSTOMER', 9, true);
 $pdf->text(48, 194, (string)$record['customer_name'], 11, true);
-$pdf->text(48, 213, $address !== '' ? $address : '—', 9);
-$pdf->text(48, 232, 'Email: ' . ($record['email'] ?: '—') . '   Phone: ' . ($record['phone'] ?: '—'), 9);
+$pdf->text(48, 213, $address !== '' ? $address : 'â€”', 9);
+$pdf->text(48, 232, 'Email: ' . ($record['email'] ?: 'â€”') . '   Phone: ' . ($record['phone'] ?: 'â€”'), 9);
 
 $ink = [0.94, 0.94, 0.94];
 $pdf->rect(48, 260, 499, 34, $ink);
@@ -108,30 +109,35 @@ $pdf->text(365, 281, 'UNIT PRICE', 9, true);
 $pdf->text(470, 281, 'TOTAL', 9, true);
 
 if ($type === 'invoice') {
-    $item = (string)($record['product_code'] ?? '—');
+    $item = (string)($record['product_code'] ?? 'â€”');
     $quantity = max(0, (int)($record['quantity'] ?? 0));
     $total = (float)$record['total_amount'];
-    $unitPrice = $quantity > 0 ? $total / $quantity : $total;
+    $lineTotal = (float)$record['order_total'];
+    $unitPrice = $quantity > 0 ? $lineTotal / $quantity : $lineTotal;
 } elseif ($type === 'receipt') {
     $item = 'Payment received (' . (string)$record['method'] . ')';
     $quantity = 1;
     $total = (float)$record['amount'];
     $unitPrice = $total;
 } else {
-    $item = (string)($record['product_code'] ?? '—');
+    $item = (string)($record['product_code'] ?? 'â€”');
     $quantity = max(0, (int)($record['quantity'] ?? 0));
     $total = 0.0;
     $unitPrice = 0.0;
 }
 
 $pdf->text(58, 315, $item, 10, true);
-$pdf->text(295, 315, $quantity > 0 ? (string)$quantity : '—', 10, true);
-$pdf->text(365, 315, $type === 'delivery' ? '—' : 'PHP ' . number_format($unitPrice, 2), 10);
-$pdf->textRight(545, 315, $type === 'delivery' ? '—' : 'PHP ' . number_format($total, 2), 10, true);
+$pdf->text(295, 315, $quantity > 0 ? (string)$quantity : 'â€”', 10, true);
+$pdf->text(365, 315, $type === 'delivery' ? 'â€”' : 'PHP ' . number_format($unitPrice, 2), 10);
+$pdf->textRight(545, 315, $type === 'delivery' ? '-' : 'PHP ' . number_format($type === 'invoice' ? $lineTotal : $total, 2), 10, true);
 $pdf->line(48, 332, 547, 332, 0.7);
 
 if ($type === 'invoice') {
-    $pdf->textRight(545, 360, 'TOTAL: PHP ' . number_format($total, 2), 14, true);
+    if ((float)$record['approved_return_total'] > 0) {
+        $pdf->text(350, 354, 'Approved returns', 10);
+        $pdf->textRight(545, 354, '-PHP ' . number_format((float)$record['approved_return_total'], 2), 10);
+    }
+    $pdf->textRight(545, 378, 'TOTAL: PHP ' . number_format($total, 2), 14, true);
     $pdf->text(48, 405, 'PAYMENT SUMMARY', 10, true);
     $pdf->text(48, 425, 'Amount paid: PHP ' . number_format((float)$record['amount_paid'], 2), 9);
     $pdf->text(48, 442, 'Balance due: PHP ' . number_format(max(0, $total - (float)$record['amount_paid']), 2), 9);
@@ -160,3 +166,4 @@ header('Content-Disposition: inline; filename="' . $filename . '"');
 header('Content-Length: ' . strlen($pdf->output()));
 echo $pdf->output();
 exit;
+

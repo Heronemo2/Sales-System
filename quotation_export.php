@@ -55,10 +55,13 @@ $pdf->text(
     10,
     true
 );
-$unit=$q['quantity']?(float)$q['total_amount']/(int)$q['quantity']:0;
-$pdf->text(365,315,'PHP '.number_format($unit,2),10); $pdf->textRight(545,315,'PHP '.number_format((float)$q['total_amount'],2),10,true);
+$shippingFee=(float)($q['shipping_fee']??0);
+$subtotal=max(0,(float)$q['total_amount']-$shippingFee);
+$unit=$q['quantity']?$subtotal/(int)$q['quantity']:0;
+$pdf->text(365,315,'PHP '.number_format($unit,2),10); $pdf->textRight(545,315,'PHP '.number_format($subtotal,2),10,true);
 $pdf->line(48,332,547,332,0.7);
-$pdf->textRight(545,360,'TOTAL: PHP '.number_format((float)$q['total_amount'],2),14,true);
+$pdf->text(350,355,'Shipping',10); $pdf->textRight(545,355,'PHP '.number_format($shippingFee,2),10);
+$pdf->textRight(545,380,'TOTAL: PHP '.number_format((float)$q['total_amount'],2),14,true);
 $pdf->text(48,405,'CUSTOMER APPROVAL',10,true);
 $pdf->text(48,425,'This quotation is subject to customer approval. Once approved,',9);
 $pdf->text(48,442,'a Purchase Order will be generated in the Sales module.',9);

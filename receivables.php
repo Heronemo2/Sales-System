@@ -11,7 +11,7 @@ include __DIR__ . '/includes/header.php';
 // Receivables are derived live from unpaid/partially-paid invoices,
 // so this list is always in sync with Sales Invoices and Collection.
 $search = trim($_GET['search'] ?? '');
-$sql = "SELECT i.invoice_no, c.customer_name AS customer_name, i.invoice_date, (i.total_amount-i.amount_paid) AS amount_due, DATE_ADD(i.invoice_date,INTERVAL 30 DAY) AS due_date FROM sales_invoices i JOIN sales_orders o ON o.so_id=i.order_id JOIN customers c ON c.cus_id=o.customer_id WHERE i.status!='Paid'";
+$sql = "SELECT i.invoice_no, c.customer_name AS customer_name, i.invoice_date, GREATEST(i.total_amount-i.amount_paid,0) AS amount_due, DATE_ADD(i.invoice_date,INTERVAL 30 DAY) AS due_date FROM sales_invoices i JOIN sales_orders o ON o.so_id=i.order_id JOIN customers c ON c.cus_id=o.customer_id WHERE i.status NOT IN ('Paid','Returned')";
 $params = [];
 if ($search !== '') {
     $sql .= ' AND (i.invoice_no LIKE ? OR c.customer_name LIKE ?)';

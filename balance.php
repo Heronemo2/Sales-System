@@ -11,7 +11,7 @@ include __DIR__ . '/includes/header.php';
 // Billed / paid / outstanding are computed live from invoices + collections,
 // so the balance is always accurate without a separate table to keep in sync.
 $search = trim($_GET['search'] ?? '');
-$sql = "SELECT c.customer_name, COALESCE(SUM(i.total_amount),0) AS total_billed, COALESCE(SUM(i.amount_paid),0) AS total_paid, COALESCE(SUM(i.total_amount-i.amount_paid),0) AS outstanding FROM customers c LEFT JOIN sales_orders o ON o.customer_id=c.cus_id LEFT JOIN sales_invoices i ON i.order_id=o.so_id GROUP BY c.cus_id,c.customer_name HAVING total_billed>0";
+$sql = "SELECT c.customer_name, COALESCE(SUM(i.total_amount),0) AS total_billed, COALESCE(SUM(i.amount_paid),0) AS total_paid, COALESCE(SUM(GREATEST(i.total_amount-i.amount_paid,0)),0) AS outstanding FROM customers c LEFT JOIN sales_orders o ON o.customer_id=c.cus_id LEFT JOIN sales_invoices i ON i.order_id=o.so_id GROUP BY c.cus_id,c.customer_name HAVING total_billed>0";
 $params = [];
 if ($search !== '') {
     $sql .= ' AND c.customer_name LIKE ?';

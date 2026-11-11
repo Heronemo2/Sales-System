@@ -15,11 +15,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'return'
         $error = 'Invalid approval decision.';
     } else {
         try {
-            $stmt = $pdo->prepare("UPDATE sales_returns SET admin_status = ?, status = ? WHERE ret_id = ? AND admin_status = 'Pending'");
-            $stmt->execute([$decision, $decision === 'Approved' ? 'Approved' : 'Rejected', $id]);
-            $notice = $stmt->rowCount() ? 'Sales return approval updated.' : 'Sales return is no longer pending.';
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("SELECT r.ret_id,r.return_no,r.order_id,r.total_amount,i.inv_id,i.total_amount invoice_total,i.amount_paid FROM sales_returns r LEFT JOIN sales_invoices i ON i.order_id=r.order_id WHERE r.ret_id=? AND r.admin_status='Pending' FOR UPDATE");
+            $stmt->execute([$id]);
+            $return = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$return) {
+                throw new RuntimeException('Sales return is no longer pending.');
+            }
+
+            if ($decision === 'Approved') {
+                $returnAmount = round((float)$return['total_amount'], 2);
+                if ($returnAmount <= 0) {
+                    throw new RuntimeException('Enter a return amount greater than zero before approving it.');
+                }
+                if (empty($return['inv_id'])) {
+                    throw new RuntimeException('No sales invoice is linked to this order, so the return cannot be applied.');
+                }
+                $invoiceTotal = round((float)$return['invoice_total'], 2);
+                if ($returnAmount > $invoiceTotal) {
+                    throw new RuntimeException('The return amount exceeds the remaining invoice total.');
+                }
+
+                $newInvoiceTotal = round($invoiceTotal - $returnAmount, 2);
+                $amountPaid = (float)$return['amount_paid'];
+                $invoiceStatus = $newInvoiceTotal <= 0
+                    ? 'Returned'
+                    : ($amountPaid >= $newInvoiceTotal
+                        ? 'Paid'
+                        : ($amountPaid > 0 ? 'Partially Paid' : 'Unpaid'));
+                $pdo->prepare('UPDATE sales_invoices SET total_amount=?,status=? WHERE inv_id=?')
+                    ->execute([$newInvoiceTotal,$invoiceStatus,(int)$return['inv_id']]);
+            }
+
+            $pdo->prepare("UPDATE sales_returns SET admin_status=?,status=? WHERE ret_id=? AND admin_status='Pending'")
+                ->execute([$decision,$decision,$id]);
+            if ($decision === 'Approved') {
+                $pdo->prepare("UPDATE sales_orders SET status='Returned' WHERE so_id=?")
+                    ->execute([(int)$return['order_id']]);
+            }
+            $pdo->commit();
+            $notice = $decision === 'Approved'
+                ? 'Sales return approved and deducted from the linked invoice.'
+                : 'Sales return rejected.';
         } catch (Throwable $e) {
-            $error = $e->getMessage();
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $error = $e instanceof RuntimeException ? $e->getMessage() : 'Could not update the sales return approval.';
         }
     }
 }

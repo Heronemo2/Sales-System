@@ -6,7 +6,7 @@ requireSalesWorkspace();
 $pdo = getDB();
 $error = '';
 $notice = '';
-$st = $pdo->query("SELECT i.*,o.order_no,o.product_code,o.quantity,c.customer_name,c.email,c.address FROM sales_invoices i JOIN sales_orders o ON o.so_id=i.order_id JOIN customers c ON c.cus_id=o.customer_id ORDER BY i.inv_id DESC");
+$st = $pdo->query("SELECT i.*,o.order_no,o.product_code,o.quantity,o.total_amount AS order_total,c.customer_name,c.email,c.address,COALESCE((SELECT SUM(r.total_amount) FROM sales_returns r WHERE r.order_id=o.so_id AND r.admin_status='Approved'),0) AS approved_return_total FROM sales_invoices i JOIN sales_orders o ON o.so_id=i.order_id JOIN customers c ON c.cus_id=o.customer_id ORDER BY i.inv_id DESC");
 $rows = $st->fetchAll();
 $pageTitle = 'Sales Invoice';
 include __DIR__ . '/includes/header.php';
@@ -72,8 +72,9 @@ include __DIR__ . '/includes/header.php';
       <div class="invoice-line">
         <div><span>Product</span><b><?= htmlspecialchars($r['product_code']) ?></b></div>
         <div><span>Quantity</span><b><?= (int)$r['quantity'] ?></b></div>
-        <div><span>Amount</span><b><?= peso((float)$r['total_amount']) ?></b></div>
+        <div><span>Amount</span><b><?= peso((float)$r['order_total']) ?></b></div>
       </div>
+      <?php if ((float)$r['approved_return_total'] > 0): ?><div class="invoice-line"><div><span>Approved returns</span><b>-<?= peso((float)$r['approved_return_total']) ?></b></div></div><?php endif; ?>
       <div class="invoice-total"><span>Total Amount</span><strong><?= peso((float)$r['total_amount']) ?></strong></div>
       <div class="invoice-status"><span class="badge <?= badgeClass($r['status']) ?>"><?= htmlspecialchars($r['status']) ?></span><a class="table-action" href="customer_account.php?section=billing">View Billing & Finance</a></div>
     </div>

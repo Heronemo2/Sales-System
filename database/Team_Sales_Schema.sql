@@ -190,7 +190,6 @@ CREATE TABLE `customers` (
   `city` varchar(100) DEFAULT NULL,
   `province` varchar(100) DEFAULT NULL,
   `payment_terms` varchar(60) NOT NULL DEFAULT '30 Days',
-  `credit_limit` decimal(12,2) NOT NULL DEFAULT 0.00,
   `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -200,11 +199,11 @@ CREATE TABLE `customers` (
 -- Dumping data for table `customers`
 --
 
-INSERT INTO `customers` (`cus_id`, `customer_code`, `customer_name`, `phone`, `email`, `address`, `city`, `province`, `payment_terms`, `credit_limit`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'CUS-001', 'Banaag Studio', '09171234567', 'banaagstudio@gmail.com', 'Rizal Avenue', 'San Pablo City', 'Laguna', '30 Days', 50000.00, 'Active', '2026-10-09 04:13:58', '2026-10-09 04:13:58'),
-(2, 'CUS-002', 'Ilagan Print Co.', '09181234567', 'ilaganprint@gmail.com', 'Maharlika Highway', 'San Pablo City', 'Laguna', '30 Days', 75000.00, 'Active', '2026-10-09 04:13:58', '2026-10-09 04:13:58'),
-(3, 'CUS-003', 'San Pablo Supplies', '09191234567', 'sanpablosupplies@gmail.com', 'Barangay San Rafael', 'San Pablo City', 'Laguna', '15 Days', 100000.00, 'Active', '2026-10-09 04:13:58', '2026-10-09 04:13:58'),
-(4, 'CUS-004', 'asdasdasd', '09171234567', 'justinebundalian76@gmail.com', 'Sta. Elena', NULL, NULL, '30 Days', 0.00, 'Active', '2026-10-26 07:51:22', '2026-10-26 07:51:22');
+INSERT INTO `customers` (`cus_id`, `customer_code`, `customer_name`, `phone`, `email`, `address`, `city`, `province`, `payment_terms`, `status`, `created_at`, `updated_at`) VALUES
+(1, 'CUS-001', 'Banaag Studio', '09171234567', 'banaagstudio@gmail.com', 'Rizal Avenue', 'San Pablo City', 'Laguna', '30 Days', 'Active', '2026-10-09 04:13:58', '2026-10-09 04:13:58'),
+(2, 'CUS-002', 'Ilagan Print Co.', '09181234567', 'ilaganprint@gmail.com', 'Maharlika Highway', 'San Pablo City', 'Laguna', '30 Days', 'Active', '2026-10-09 04:13:58', '2026-10-09 04:13:58'),
+(3, 'CUS-003', 'San Pablo Supplies', '09191234567', 'sanpablosupplies@gmail.com', 'Barangay San Rafael', 'San Pablo City', 'Laguna', '15 Days', 'Active', '2026-10-09 04:13:58', '2026-10-09 04:13:58'),
+(4, 'CUS-004', 'asdasdasd', '09171234567', 'justinebundalian76@gmail.com', 'Sta. Elena', NULL, NULL, '30 Days', 'Active', '2026-10-26 07:51:22', '2026-10-26 07:51:22');
 
 -- --------------------------------------------------------
 
@@ -243,6 +242,7 @@ CREATE TABLE `customer_order_requests` (
   `request_date` date NOT NULL,
   `product_code` varchar(40) NOT NULL,
   `quantity` int(10) UNSIGNED NOT NULL,
+  `shipping_fee` decimal(12,2) NOT NULL DEFAULT 0.00,
   `notes` varchar(500) DEFAULT NULL,
   `status` enum('Pending Quotation','Quotation Sent','Quotation Approved','Quotation Rejected','Converted','Cancelled') NOT NULL DEFAULT 'Pending Quotation',
   `quotation_id` int(10) UNSIGNED DEFAULT NULL,
@@ -310,6 +310,7 @@ CREATE TABLE `inventory` (
   `size` varchar(30) DEFAULT '',
   `unit` varchar(30) NOT NULL DEFAULT 'pcs',
   `stock_quantity` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `unit_price` decimal(12,2) NOT NULL DEFAULT 0.00,
   `reorder_level` decimal(12,2) NOT NULL DEFAULT 0.00,
   `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
   `last_updated` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
@@ -418,7 +419,7 @@ CREATE TABLE `sales_invoices` (
   `invoice_date` date NOT NULL,
   `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `amount_paid` decimal(12,2) NOT NULL DEFAULT 0.00,
-  `status` enum('Unpaid','Partially Paid','Paid') NOT NULL DEFAULT 'Unpaid',
+  `status` enum('Unpaid','Partially Paid','Paid','Returned') NOT NULL DEFAULT 'Unpaid',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -427,7 +428,7 @@ CREATE TABLE `sales_invoices` (
 --
 
 INSERT INTO `sales_invoices` (`inv_id`, `invoice_no`, `order_id`, `invoice_date`, `total_amount`, `amount_paid`, `status`, `created_at`) VALUES
-(1, 'INV-0001', 1, '2026-10-04', 12000.00, 12000.00, 'Paid', '2026-10-09 04:13:58'),
+(1, 'INV-0001', 1, '2026-10-04', 11400.00, 12000.00, 'Paid', '2026-10-09 04:13:58'),
 (2, 'INV-3002', 2, '2026-10-09', 150000.00, 150000.00, 'Paid', '2026-10-09 06:02:41'),
 (3, 'INV-3003', 3, '2026-10-09', 150018.00, 150018.00, 'Paid', '2026-10-09 06:52:32'),
 (4, 'INV-3004', 4, '2026-10-09', 150000.00, 150000.00, 'Paid', '2026-10-09 20:26:36');
@@ -447,7 +448,7 @@ CREATE TABLE `sales_orders` (
   `product_code` varchar(40) DEFAULT NULL,
   `quantity` int(10) UNSIGNED DEFAULT NULL,
   `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
-  `status` enum('Pending','Processing','Invoiced','Completed','Cancelled') NOT NULL DEFAULT 'Pending',
+  `status` enum('Pending','Processing','Invoiced','Completed','Cancelled','Returned') NOT NULL DEFAULT 'Pending',
   `admin_status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
   `payment_method` enum('GCash','Bank Transfer','Cash on Delivery') NOT NULL DEFAULT 'Cash on Delivery',
   `payment_status` enum('Pending','Paid','Failed') NOT NULL DEFAULT 'Pending',
@@ -470,6 +471,37 @@ INSERT INTO `sales_orders` (`so_id`, `order_no`, `quotation_id`, `customer_id`, 
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `sales_settings`
+--
+
+CREATE TABLE `sales_settings` (
+  `setting_key` varchar(60) NOT NULL,
+  `setting_value` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `sales_settings` (`setting_key`, `setting_value`) VALUES ('shipping_fee', 0.00), ('shipping_rate_per_km', 10.00);
+
+CREATE TABLE `sales_shipping_distance_cache` (
+  `cache_key` char(64) NOT NULL,
+  `distance_meters` int(10) UNSIGNED NOT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`cache_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Legacy city-based rates retained for existing records. Active shipping uses the road rate above.
+CREATE TABLE `sales_shipping_rates` (
+  `rate_id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `province` varchar(100) NOT NULL,
+  `city` varchar(100) NOT NULL,
+  `shipping_fee` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `active` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`rate_id`),
+  UNIQUE KEY `uq_shipping_destination` (`province`,`city`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Table structure for table `sales_quotations`
 --
 
@@ -488,6 +520,7 @@ CREATE TABLE `sales_quotations` (
   `inventory_status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
   `customer_status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
   `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `shipping_fee` decimal(12,2) NOT NULL DEFAULT 0.00,
   `status` enum('Pending','Approved','Rejected','Expired') NOT NULL DEFAULT 'Pending',
   `admin_status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
   `payment_method` enum('GCash','Bank Transfer','Cash on Delivery') NOT NULL DEFAULT 'Cash on Delivery',

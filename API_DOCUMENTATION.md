@@ -135,7 +135,7 @@ Do not include password or password hash in any response. Consider rate limiting
 
 | Method and path | Access | Request | Success |
 |---|---|---|---|
-| `POST /quotations` | Sales Staff | `customerId`, optional `requestId`, `productCode`, positive integer `quantity`, `unitPrice` decimal string, `quotationDate`, optional `validUntil` | `201` quotation |
+| `POST /quotations` | Sales Staff | `customerId`, optional `requestId`, `productCode`, positive integer `quantity`, `quotationDate`, optional `validUntil`; unit price is resolved from Team Sales inventory | `201` quotation |
 | `GET /quotations/{quotationId}` | Sales Admin/Staff | No body | `200` quotation or `404` |
 | `POST /quotations/{quotationId}/decision` | Customer route disabled | `{"decision":"approve"}` or `{"decision":"reject"}` | Proposed `200` updated decision |
 | `POST /quotations/{quotationId}/admin-decision` | Sales Admin | `{"decision":"approve","reason":"..."}` or `{"decision":"reject","reason":"..."}` | `200` updated admin decision |

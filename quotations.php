@@ -32,7 +32,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $requestId  = (int)($_POST['request_id'] ?? 0);
         $date       = $_POST['quotation_date'] ?? date('Y-m-d');
         $validUntil = $_POST['valid_until'] ?? null;
-        $unitPrice  = filter_var($_POST['unit_price'] ?? null, FILTER_VALIDATE_FLOAT);
 
         /*
         |--------------------------------------------------------------------------
@@ -58,11 +57,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $error = 'Customer order request not found or it already has a quotation.';
 
-        } elseif ($unitPrice === false || $unitPrice <= 0) {
-
-            $error = 'Enter a valid unit price greater than zero to create the quotation.';
-
         } else {
+
+            $priceStmt = $pdo->prepare("SELECT unit_price FROM inventory WHERE BINARY product_code = BINARY ? AND status = 'Active' LIMIT 1");
+            $priceStmt->execute([$request['product_code']]);
+            $unitPrice = $priceStmt->fetchColumn();
+
+            if ($unitPrice === false || (float)$unitPrice <= 0) {
+                $error = 'Set a fixed price for this item in Sales Inventory before creating its quotation.';
+            } else {
 
             /*
             |--------------------------------------------------------------------------
@@ -83,7 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stock = $check['stock'];
 
                 // Inventory supplies the product/master data; Team Sales stock determines whether the quotation can be approved.
-                $total = round($unitPrice * (int)$request['quantity'], 2);
+                $shippingFee = round((float)($request['shipping_fee'] ?? 0), 2);
+                $total = round((float)$unitPrice * (int)$request['quantity'] + $shippingFee, 2);
 
                 if ($total <= 0 || !is_finite($total)) {
 
@@ -129,6 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 inventory_checked_at,
                                 inventory_status,
                                 total_amount,
+                                shipping_fee,
                                 status,
                                 admin_status,
                                 customer_status
@@ -136,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             VALUES
                             (
                                 ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?,
-                                ?, 'Pending', 'Pending', 'Pending'
+                                ?, ?, 'Pending', 'Pending', 'Pending'
                             )
                         ");
 
@@ -157,7 +162,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             (int)$check['available'],
 
                             $check['status'],
-                            $total
+                            $total,
+                            $shippingFee
                         ]);
 
                         /*
@@ -227,6 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $e->getMessage();
                     }
                 }
+            }
             }
         }
     }
@@ -397,10 +404,13 @@ $rows = $st->fetchAll();
 $requests = $pdo->query("
     SELECT
         r.*,
-        c.customer_name
+        c.customer_name,
+        i.unit_price
     FROM customer_order_requests r
     JOIN customers c
         ON c.cus_id = r.customer_id
+    LEFT JOIN inventory i
+        ON BINARY i.product_code = BINARY r.product_code
     WHERE r.status = 'Pending Quotation'
     ORDER BY r.req_id DESC
 ")->fetchAll();
@@ -660,7 +670,7 @@ try {
 
     <!-- Unit Price -->
     <div class="quotation-field">
-        <label for="unit_price">
+        <label for="unit_price_<?= (int)$r['req_id'] ?>">
             Unit Price (₱)
         </label>
 
@@ -669,14 +679,17 @@ try {
 
             <input
                 type="number"
-                id="unit_price"
-                name="unit_price"
-                min="0.01"
+                id="unit_price_<?= (int)$r['req_id'] ?>"
+                name="unit_price_display"
                 step="0.01"
-                placeholder="Enter selling price"
-                required
+                value="<?= (float)($r['unit_price'] ?? 0) > 0 ? htmlspecialchars(number_format((float)$r['unit_price'], 2, '.', '')) : '' ?>"
+                placeholder="Set price in Sales Inventory"
+                readonly
             >
         </div>
+        <?php if ((float)($r['unit_price'] ?? 0) <= 0): ?>
+            <small>Set this item’s fixed price in Sales Inventory before creating its quotation.</small>
+        <?php endif; ?>
     </div>
 
 
@@ -708,6 +721,7 @@ try {
                                 <button
                                     type="submit"
                                     class="primary-btn"
+                                    <?= (float)($r['unit_price'] ?? 0) <= 0 ? 'disabled' : '' ?>
                                 >
                                     Create & Send Quotation
                                 </button>
@@ -1052,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.querySelectorAll('.quotation-modal').forEach(function (modal) {
-        var price = modal.querySelector('input[name="unit_price"]');
+        var price = modal.querySelector('input[name="unit_price_display"]');
         if (!price) return;
 
         var quantityText = modal.querySelector('.modal-subtitle');

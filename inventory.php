@@ -19,7 +19,7 @@ try {
 try {
     $rows = $pdo->query("
         SELECT inventory_id, product_code, product_name, brand, size, unit,
-               stock_quantity, reorder_level, status, last_updated
+               stock_quantity, unit_price, reorder_level, status, last_updated
         FROM inventory
         WHERE status = 'Active'
         ORDER BY product_name ASC
@@ -64,7 +64,7 @@ include __DIR__ . '/includes/header.php';
                 <p class="eyebrow">TEAM SALES INVENTORY</p>
                 <h2 style="margin:0;">Inventory</h2>
                 <p style="color:var(--muted);margin:5px 0 0;">
-                    Brand, size, and reorder level are referenced from Inventory System finished goods. Stock shown here is held by Team Sales and updated after an Inventory System stock-out is approved.
+                    Fixed prices are managed by Sales Admin. Stock is held by Team Sales and updated after Inventory System stock-outs are approved.
                 </p>
             </div>
         </div>
@@ -79,6 +79,7 @@ include __DIR__ . '/includes/header.php';
                         <th>SIZE</th>
                         <th>UNIT</th>
                         <th>TEAM SALES STOCK</th>
+                        <th>FIXED PRICE</th>
                         <th>REORDER LEVEL</th>
                         <th>STATUS</th>
                         <th>LAST UPDATED</th>
@@ -86,7 +87,7 @@ include __DIR__ . '/includes/header.php';
                 </thead>
                 <tbody>
                 <?php if (!$rows): ?>
-                    <tr><td colspan="9" style="text-align:center;padding:30px;">No Team Sales inventory yet. Approved Inventory stock-outs will appear here.</td></tr>
+                    <tr><td colspan="10" style="text-align:center;padding:30px;">No Team Sales inventory yet. Approved Inventory stock-outs will appear here.</td></tr>
                 <?php else: ?>
                     <?php foreach ($rows as $r): ?>
                     <tr>
@@ -96,6 +97,7 @@ include __DIR__ . '/includes/header.php';
                         <td><?= htmlspecialchars($r['size'] ?? '') ?></td>
                         <td><?= htmlspecialchars($r['unit']) ?></td>
                         <td><strong><?= htmlspecialchars(rtrim(rtrim(number_format((float)$r['stock_quantity'],2,'.',''), '0'), '.')) ?></strong></td>
+                        <td><?= (float)$r['unit_price'] > 0 ? peso((float)$r['unit_price']) : 'Not set' ?></td>
                         <td><?= htmlspecialchars(rtrim(rtrim(number_format((float)$r['reorder_level'],2,'.',''), '0'), '.')) ?></td>
                         <td><span class="badge <?= badgeClass($r['status']) ?>"><?= htmlspecialchars($r['status']) ?></span></td>
                         <td><?= htmlspecialchars($r['last_updated']) ?></td>
