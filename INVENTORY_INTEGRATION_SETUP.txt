@@ -8,7 +8,7 @@ stock-out ID.
 
 Required Sales environment variables:
 
-  INVENTORY_API_BASE_URL=http://localhost/Inventory_System/inventory_management/api
+  INVENTORY_API_BASE_URL=http://localhost/Inventory_System/api
   INVENTORY_API_KEY=<shared Sales-to-Inventory API key>
 
 Generate a new random secret for this integration and store it outside source
@@ -19,7 +19,7 @@ For Apache, set these values in the relevant VirtualHost or Directory
 configuration, then restart Apache. Example (replace the base URL for your
 deployment and generate a private key):
 
-  SetEnv INVENTORY_API_BASE_URL "http://localhost/Inventory_System/inventory_management/api"
+  SetEnv INVENTORY_API_BASE_URL "http://localhost/Inventory_System/api"
   SetEnv INVENTORY_API_KEY "<new-random-secret>"
 
 Configure the Sales Apache scope's INVENTORY_API_KEY to match the existing
@@ -36,10 +36,10 @@ PHP requirements:
 
 Sales API usage:
 
-  GET  items.php     Read active item IDs, codes, names, types, brands, sizes,
-                     units, reorder levels, and active warehouses. This
-                     endpoint does not expose inventory quantities or
-                     finished-good database IDs.
+  GET  items.php     Read active item IDs, codes, names, types, sizes, units,
+                     and active warehouses. The current API does not expose
+                     brand, price, or stock quantities. Use Sales-owned data
+                     for sellable stock and pricing.
   POST requests.php  Submit a Sales stock request for Inventory approval.
   GET  requests.php  Read Sales-destination request status and approved
                      quantities. The POST response contains a request

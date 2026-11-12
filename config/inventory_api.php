@@ -19,7 +19,7 @@ function inventoryApiEnvironmentValue(string $name): string
 function inventoryApiRequest(string $method, string $endpoint, ?array $payload = null): array
 {
     $baseUrl = rtrim(
-        inventoryApiEnvironmentValue('INVENTORY_API_BASE_URL') ?: 'http://localhost/Inventory_System/inventory_management/api',
+        inventoryApiEnvironmentValue('INVENTORY_API_BASE_URL') ?: 'http://localhost/Inventory_System/api',
         '/'
     );
     $apiKey = inventoryApiEnvironmentValue('INVENTORY_API_KEY');
