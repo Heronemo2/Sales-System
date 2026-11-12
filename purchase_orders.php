@@ -20,10 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$po) {
             $error = 'Purchase Order not found or already converted.';
         } else {
-            // Validate that the product is active; Sales stock is checked at order approval.
-            $stockCheck = checkInventoryProduct((string)$po['product_code']);
-            if (empty($stockCheck['ok']) || ($stockCheck['status'] ?? '') !== 'Active') {
-                $error = $stockCheck['error'] ?? 'Could not check Inventory. Purchase Order remains open.';
+            $salesStock = getTeamSalesInventory($pdo, (string)$po['product_code']);
+            $available = (float)($salesStock['stock_quantity'] ?? 0);
+            if (!$salesStock || ($salesStock['status'] ?? '') !== 'Active' || $available < (int)$po['quantity']) {
+                $error = 'There is not enough Team Sales stock to create a Sales Order. Request the shortage from the Purchase Order Requests menu first.';
             } else {
             $orderNo = nextDocNo($pdo, 'sales_orders', 'SO-', 1000);
             $pay = $pdo->prepare("SELECT payment_method,payment_status,payment_reference,paid_at,receipt_no FROM sales_quotations WHERE sq_id=?");
@@ -92,6 +92,14 @@ $sql .= ' ORDER BY po.po_id DESC';
 $stmtRows = $pdo->prepare($sql);
 $stmtRows->execute($params);
 $rows = $stmtRows->fetchAll();
+foreach ($rows as &$row) {
+    $stock = getTeamSalesInventory($pdo, (string)$row['product_code']);
+    $row['available_stock'] = (float)($stock['stock_quantity'] ?? 0);
+    $row['enough_stock'] = $stock
+        && ($stock['status'] ?? '') === 'Active'
+        && $row['available_stock'] >= (int)$row['quantity'];
+}
+unset($row);
 
 ?>
 <div class="page-toolbar">
@@ -135,7 +143,11 @@ $rows = $stmtRows->fetchAll();
                             <a class="table-action" href="po_export.php?id=<?= (int)$r['po_id'] ?>&format=pdf" target="_blank">PDF</a>
                             <a class="table-action" href="po_export.php?id=<?= (int)$r['po_id'] ?>&format=doc">Word</a>
                             <?php if ($r['status'] === 'Open'): ?>
-                                <form method="POST" style="display:inline"><input type="hidden" name="action" value="convert"><input type="hidden" name="po_id" value="<?= (int)$r['po_id'] ?>"><button class="table-action" type="submit">Create Sales Order</button></form>
+                                <?php if ($r['enough_stock']): ?>
+                                    <form method="POST" style="display:inline"><input type="hidden" name="action" value="convert"><input type="hidden" name="po_id" value="<?= (int)$r['po_id'] ?>"><button class="table-action" type="submit">Create Sales Order</button></form>
+                                <?php else: ?>
+                                    <a class="table-action" href="purchase_order_requests.php">Request Stock</a>
+                                <?php endif; ?>
                             <?php else: ?><small><?= htmlspecialchars($r['converted_order_no'] ?? 'Converted') ?></small><?php endif; ?>
                         </td>
                     </tr>

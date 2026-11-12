@@ -5,7 +5,7 @@ $userRole = $user['role'] ?? '';
 $corePages = ['quotations.php', 'purchase_orders.php', 'orders.php', 'delivery.php', 'returns.php'];
 $billingPages = ['invoices.php', 'customer_account.php'];
 $salesReport = ['reports.php'];
-$inventoryPages = ['inventory.php', 'inventory_stockout_approval.php'];
+$inventoryPages = ['inventory.php', 'inventory_stockout_approval.php', 'purchase_order_requests.php'];
 $activeSection = '';
 if (in_array($current, $billingPages, true)) $activeSection = 'billing';
 elseif (in_array($current, $corePages, true)) $activeSection = 'core';
@@ -42,6 +42,7 @@ $isCustomer = $userRole === 'Customer';
                 <a class="section-nav <?= $current === 'admin_customers.php' ? 'active' : '' ?>" href="admin_customers.php"><span class="nav-icon">C</span><span>Customer Management</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'customer_account_approvals.php' ? 'active' : '' ?>" href="customer_account_approvals.php"><span class="nav-icon">V</span><span>Customer Account Verification</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'sales_quotation_approval.php' ? 'active' : '' ?>" href="sales_quotation_approval.php"><span class="nav-icon">Q</span><span>Sales Quotation Approval</span><span class="section-arrow">&rsaquo;</span></a>
+                <a class="section-nav <?= $current === 'purchase_order_requests.php' ? 'active' : '' ?>" href="purchase_order_requests.php"><span class="nav-icon">P</span><span>Purchase Order Requests</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'sales_order_approval.php' ? 'active' : '' ?>" href="sales_order_approval.php"><span class="nav-icon">O</span><span>Sales Order Approval</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'sales_return_approval.php' ? 'active' : '' ?>" href="sales_return_approval.php"><span class="nav-icon">R</span><span>Sales Return Approval</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'inventory_stockout_approval.php' ? 'active' : '' ?>" href="inventory_stockout_approval.php"><span class="nav-icon">I</span><span>Request Stock from Inventory</span><span class="section-arrow">&rsaquo;</span></a>

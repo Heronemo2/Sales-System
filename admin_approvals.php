@@ -39,12 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         | QUOTATION APPROVAL
         |--------------------------------------------------------------------------
         |
-        | A quotation can only be approved by Sales Admin when:
-        |
-        | 1. Inventory currently has enough stock, OR
-        | 2. Inventory has approved the stock request created for this quotation.
-        |
-        | Team Sales never changes Inventory stock here.
+        | Quotation approval releases the quotation to the customer.
+        | Stock is handled later from the Purchase Order Request queue.
         |--------------------------------------------------------------------------
         */
         if ($type === 'quotation' && in_array($decision, ['Approved', 'Rejected'], true)) {
@@ -69,32 +65,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if ($decision === 'Approved') {
-
                 $localStock = getTeamSalesInventory(
                     $pdo,
                     (string)$quotation['product_code']
                 );
-
                 $available = (float)($localStock['stock_quantity'] ?? 0);
                 $required = (float)$quotation['quantity'];
-
-                $enoughCurrentStock =
-                    $localStock &&
-                    ($required > 0) &&
-                    ($available >= $required) &&
-                    (($localStock['status'] ?? 'Active') === 'Active');
-
-                if (!$enoughCurrentStock) {
-                    throw new RuntimeException(
-                        'This quotation cannot be approved yet because Team Sales Inventory has insufficient stock. Request an Inventory stock-out first.'
-                    );
-                }
+                $enoughCurrentStock = $localStock
+                    && $required > 0
+                    && $available >= $required
+                    && (($localStock['status'] ?? 'Active') === 'Active');
 
                 $s = $pdo->prepare("
                     UPDATE sales_quotations
                     SET
                         admin_status = 'Approved',
-                        inventory_status = 'Approved',
+                        inventory_status = ?,
                         inventory_quantity = ?,
                         inventory_checked_at = NOW()
                     WHERE sq_id = ?
@@ -102,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
 
                 $s->execute([
+                    $enoughCurrentStock ? 'Approved' : 'Pending',
                     (int)$available,
                     $id
                 ]);
@@ -140,107 +127,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         /*
         |--------------------------------------------------------------------------
-        | REQUEST STOCKOUT FROM SALES APPROVAL
+        | LEGACY QUOTATION STOCK REQUEST
         |--------------------------------------------------------------------------
-        | The request form is opened from the Sales Approval quotation card.
-        | This keeps the stock request workflow in one place.
+        | Keep old form submissions from creating quotation-based stock requests.
         */
-        } elseif ($type === 'request_stockout') {
-
-            $quotationId = (int)($_POST['quotation_id'] ?? 0);
-            $productCode = trim($_POST['product_code'] ?? '');
-            $quantity = (float)($_POST['quantity'] ?? 0);
-            $reference = trim($_POST['reference'] ?? '');
-
-            $st = $pdo->prepare("
-                SELECT q.*
-                FROM sales_quotations q
-                WHERE q.sq_id = ?
-                  AND q.admin_status = 'Pending'
-                LIMIT 1
-            ");
-            $st->execute([$quotationId]);
-            $quotation = $st->fetch(PDO::FETCH_ASSOC);
-
-            if (!$quotation) {
-                throw new RuntimeException('Quotation was not found or is no longer pending.');
-            }
-
-            if ($productCode === '' || $quantity <= 0 || floor($quantity) !== $quantity) {
-                throw new RuntimeException('Select a product and enter a positive whole-number quantity.');
-            }
-
-            if ((string)$quotation['product_code'] !== $productCode) {
-                throw new RuntimeException('The selected product does not match the quotation.');
-            }
-
-            $localStock = getTeamSalesInventory($pdo, $productCode);
-            $available = (float)($localStock['stock_quantity'] ?? 0);
-            $required = (float)$quotation['quantity'];
-            $missing = max(0, $required - $available);
-
-            if ($missing <= 0) {
-                throw new RuntimeException('Team Sales Inventory already has enough stock. You can approve the quotation.');
-            }
-
-            if ($quantity < $required) {
-                throw new RuntimeException(
-                    'The requested quantity must be at least the quotation quantity of ' . rtrim(rtrim(number_format($required, 2, '.', ''), '0'), '.') . '.'
-                );
-            }
-
-            $existingRequestStmt = $pdo->prepare("
-                SELECT request_status
-                FROM inventory_stockout_approvals
-                WHERE source_reference = ?
-                ORDER BY id DESC
-                LIMIT 1
-            ");
-            $existingRequestStmt->execute([(string)$quotation['quotation_no']]);
-            $existingRequestStatus = $existingRequestStmt->fetchColumn();
-            if ($existingRequestStatus === 'Requested') {
-                throw new RuntimeException('A stock request for this quotation is already waiting for the Inventory System.');
-            }
-            if ($existingRequestStatus === 'Stocked Out') {
-                throw new RuntimeException('Inventory has stocked out the requested items. Approve the stock-out in Team Sales before requesting more.');
-            }
-
-            if ($reference === '') {
-                $reference = (string)$quotation['quotation_no'];
-            }
-
-            $result = createTeamSalesStockoutRequest(
-                $pdo,
-                $productCode,
-                $quantity,
-                $reference
-            );
-
-            $pdo->prepare("
-                UPDATE sales_quotations
-                SET
-                    inventory_status = 'Pending',
-                    inventory_quantity = ?,
-                    inventory_checked_at = NOW()
-                WHERE sq_id = ?
-                  AND admin_status = 'Pending'
-            ")->execute([
-                (int)$available,
-                $quotationId
-            ]);
-
-            $notice = $result['message'] .
-                (!empty($result['request_number'])
-                    ? ' Request No.: ' . $result['request_number']
-                    : '');
-
-            logActivity(
-                $pdo,
-                'Create',
-                'Inventory Stock Request',
-                'Requested Inventory stock for quotation ' . $quotation['quotation_no'],
-                $quotationId
-            );
+        } elseif (in_array($type, ['request_stockout', 'quotation_stock_request'], true)) {
+            throw new RuntimeException('Quotation stock requests are no longer available. Use Purchase Order Requests after the customer approves the quotation.');
 
         /*
         |--------------------------------------------------------------------------
@@ -280,74 +172,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 (int)($result['request_id'] ?? 0)
             );
 
-        } elseif ($type === 'quotation_stock_request') {
-
-            $st = $pdo->prepare("
-                SELECT
-                    q.*,
-                    c.customer_name,
-                    c.email AS customer_email
-                FROM sales_quotations q
-                JOIN customers c
-                    ON c.cus_id = q.customer_id
-                WHERE q.sq_id = ?
-                  AND q.admin_status = 'Pending'
-                LIMIT 1
-            ");
-            $st->execute([$id]);
-            $quotation = $st->fetch();
-
-            if (!$quotation) {
-                throw new RuntimeException('Quotation was not found or is no longer pending.');
-            }
-
-            $localStock = getTeamSalesInventory(
-                $pdo,
-                (string)$quotation['product_code']
-            );
-
-            $available = (float)($localStock['stock_quantity'] ?? 0);
-            $required = (float)$quotation['quantity'];
-            $missing = max(0, $required - $available);
-
-            if ($missing <= 0) {
-                throw new RuntimeException(
-                    'Team Sales Inventory already has enough stock. You can approve the quotation.'
-                );
-            }
-
-            $result = createTeamSalesStockoutRequest(
-                $pdo,
-                (string)$quotation['product_code'],
-                $required,
-                (string)$quotation['quotation_no']
-            );
-
-            $pdo->prepare("
-                UPDATE sales_quotations
-                SET
-                    inventory_status = 'Pending',
-                    inventory_quantity = ?,
-                    inventory_checked_at = NOW()
-                WHERE sq_id = ?
-            ")->execute([
-                (int)$available,
-                $id
-            ]);
-
-            $notice = $result['message'] .
-                (!empty($result['request_number'])
-                    ? ' Request No.: ' . $result['request_number']
-                    : '');
-
-            logActivity(
-                $pdo,
-                'Create',
-                'Inventory Stock Request',
-                'Requested Inventory stock for quotation ' . $quotation['quotation_no'],
-                $id
-            );
-
         /*
         |--------------------------------------------------------------------------
         | SALES ORDER APPROVAL
@@ -374,17 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $required = (float)($orderRow['quantity'] ?? 0);
 
                 if (!$localStock || $available < $required) {
-                    $requestResult = createTeamSalesStockoutRequest(
-                        $pdo,
-                        (string)($orderRow['product_code'] ?? ''),
-                        $required,
-                        (string)($orderRow['order_no'] ?? 'Sales Order')
-                    );
-
-                    throw new RuntimeException(
-                        ($requestResult['message'] ?? 'Inventory stock-out request sent.') .
-                        ' The Sales Order remains pending until the stock-out is approved in Team Sales.'
-                    );
+                    throw new RuntimeException('Not enough Team Sales stock to approve this Sales Order. Request stock from the Purchase Order Requests menu before approving.');
                 }
                 $delivery = convertOrderToDelivery($pdo, $id);
                 $invoiceNo = ensureSalesInvoiceForOrder($pdo, $id);
@@ -622,7 +436,7 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
             </h2>
 
             <p class="muted">
-                The Sales Admin checks Team Sales Inventory before approving the quotation for the customer.
+                Approve quotations for the customer regardless of current Sales stock. Request replenishment from Purchase Order Requests after the customer accepts.
             </p>
 
         </div>
@@ -637,7 +451,7 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
             <?php
                 $request = $q['inventory_request'] ?? null;
                 $requestStatus = $request['request_status'] ?? '';
-                $canApprove = $q['enough_stock'];
+                $canApprove = true;
             ?>
 
             <article class="approval-container-card">
@@ -753,44 +567,6 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
                     >
                         View Quotation
                     </a>
-
-
-                    <?php if (!$q['enough_stock']): ?>
-
-                        <?php if ($requestStatus === 'Requested'): ?>
-
-                            <button
-                                class="secondary-btn"
-                                type="button"
-                                disabled
-                            >
-                                Waiting for Inventory
-                            </button>
-
-                        <?php elseif ($requestStatus === 'Stocked Out'): ?>
-
-                            <a class="secondary-btn" href="inventory_stockout_approval.php">
-                                Approve Stockout First
-                            </a>
-
-                        <?php else: ?>
-
-                            <button
-                                class="primary-btn stock-request-trigger"
-                                type="button"
-                                data-quotation-id="<?= (int)$q['sq_id'] ?>"
-                                data-product-code="<?= htmlspecialchars((string)$q['product_code'], ENT_QUOTES) ?>"
-                                data-product-name="<?= htmlspecialchars((string)($q['product_code'] . ' — ' . ($q['product_name'] ?? '')), ENT_QUOTES) ?>"
-                                data-quantity="<?= htmlspecialchars((string)(float)$q['quantity'], ENT_QUOTES) ?>"
-                                data-reference="<?= htmlspecialchars((string)$q['quotation_no'], ENT_QUOTES) ?>"
-                                onclick="openStockRequestModal(this)"
-                            >
-                                Request Stock
-                            </button>
-
-                        <?php endif; ?>
-
-                    <?php endif; ?>
 
 
                     <?php
@@ -1083,107 +859,7 @@ function approvalForm(string $type, int $id, bool $disabled = false): void
     </div>
 </div>
 
-<!-- STOCK REQUEST MODAL -->
-<div id="stockRequestModal" class="stock-request-modal" aria-hidden="true">
-    <div class="stock-request-backdrop" onclick="closeStockRequestModal()"></div>
-    <div class="stock-request-dialog" role="dialog" aria-modal="true" aria-labelledby="stockRequestTitle">
-        <div class="stock-request-dialog-head">
-            <div>
-                <p class="eyebrow dark" style="margin-bottom:6px;">REQUEST STOCKOUT</p>
-                <h2 id="stockRequestTitle" style="margin:0;">Request Stock from Inventory</h2>
-                <p class="muted" style="margin:6px 0 0;">Request the full quotation quantity from the Inventory System for approval and stock-out.</p>
-            </div>
-            <button type="button" class="stock-request-close" onclick="closeStockRequestModal()" aria-label="Close">&times;</button>
-        </div>
 
-        <form method="POST" class="stock-request-form">
-            <input type="hidden" name="type" value="request_stockout">
-            <input type="hidden" name="quotation_id" id="stockRequestQuotationId">
-
-            <div class="stock-request-product">
-                <span>PRODUCT</span>
-                <strong id="stockRequestProductName">—</strong>
-            </div>
-
-            <div class="stock-request-fields">
-                <label>
-                    <span>Product Code</span>
-                    <input type="text" name="product_code" id="stockRequestProductCode" readonly required>
-                </label>
-
-                <label>
-                    <span>Quantity to Request</span>
-                    <input type="number" name="quantity" id="stockRequestQuantity" min="1" step="1" required>
-                    <small id="stockRequestQuantityHint">Minimum quotation quantity: —</small>
-                </label>
-            </div>
-
-            <label>
-                <span>Reference / Reason</span>
-                <input type="text" name="reference" id="stockRequestReference" maxlength="100" required>
-            </label>
-
-            <div class="stock-request-info">
-                <span>After submission</span>
-                <p>Request will show as <b>Waiting for Inventory</b>. Once Inventory performs the stock-out, it will appear in <b>Inventory Stockout Approval</b> for Team Sales approval.</p>
-            </div>
-
-            <div class="stock-request-actions">
-                <button type="button" class="secondary-btn" onclick="closeStockRequestModal()">Cancel</button>
-                <button type="submit" class="primary-btn">Send Stock Request</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<style>
-.stock-request-modal{display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;padding:24px;}
-.stock-request-modal.is-open{display:flex;}
-.stock-request-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.48);backdrop-filter:blur(3px);}
-.stock-request-dialog{position:relative;width:min(620px,100%);background:#fff;border:1px solid #eadfdf;border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.20);overflow:hidden;}
-.stock-request-dialog-head{display:flex;justify-content:space-between;gap:20px;padding:24px 26px 18px;border-bottom:1px solid #eee5e5;}
-.stock-request-close{border:0;background:#f5f1f1;color:#333;width:36px;height:36px;border-radius:50%;font-size:25px;line-height:1;cursor:pointer;flex:0 0 auto;}
-.stock-request-close:hover{background:#ece4e4;}
-.stock-request-form{padding:22px 26px 26px;display:grid;gap:16px;}
-.stock-request-form label{display:grid;gap:7px;font-weight:600;color:#242424;}
-.stock-request-form label>span{font-size:13px;letter-spacing:.02em;}
-.stock-request-form input{width:100%;box-sizing:border-box;border:1px solid #ddd4d4;border-radius:11px;padding:12px 13px;font:inherit;background:#fff;outline:none;}
-.stock-request-form input:focus{border-color:#b70000;box-shadow:0 0 0 3px rgba(183,0,0,.08);}
-.stock-request-form input[readonly]{background:#f7f4f4;color:#555;}
-.stock-request-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.stock-request-form small{font-size:12px;color:#777;}
-.stock-request-product{padding:15px 16px;border:1px solid #eee0e0;border-radius:13px;background:#faf7f7;display:grid;gap:4px;}
-.stock-request-product span,.stock-request-info>span{font-size:11px;font-weight:800;letter-spacing:.08em;color:#8a7777;}
-.stock-request-product strong{font-size:17px;}
-.stock-request-info{padding:13px 15px;border-radius:12px;background:#f7f8fa;border:1px solid #e7e9ed;}
-.stock-request-info p{margin:5px 0 0;color:#666;font-size:13px;line-height:1.5;}
-.stock-request-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:4px;}
-@media(max-width:650px){.stock-request-fields{grid-template-columns:1fr;}.stock-request-dialog-head,.stock-request-form{padding-left:18px;padding-right:18px;}}
-</style>
-
-<script>
-function openStockRequestModal(button){
-    const modal=document.getElementById('stockRequestModal');
-    if(!modal)return;
-    document.getElementById('stockRequestQuotationId').value=button.dataset.quotationId||'';
-    document.getElementById('stockRequestProductCode').value=button.dataset.productCode||'';
-    document.getElementById('stockRequestProductName').textContent=button.dataset.productName||button.dataset.productCode||'—';
-    document.getElementById('stockRequestQuantity').value=button.dataset.quantity||'';
-    document.getElementById('stockRequestQuantity').min=button.dataset.quantity||'0.01';
-    document.getElementById('stockRequestQuantityHint').textContent='Minimum quotation quantity: '+(button.dataset.quantity||'0');
-    document.getElementById('stockRequestReference').value=button.dataset.reference||'';
-    modal.classList.add('is-open');
-    modal.setAttribute('aria-hidden','false');
-    document.getElementById('stockRequestQuantity').focus();
-}
-function closeStockRequestModal(){
-    const modal=document.getElementById('stockRequestModal');
-    if(!modal)return;
-    modal.classList.remove('is-open');
-    modal.setAttribute('aria-hidden','true');
-}
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeStockRequestModal();});
-</script>
 
 
 <style>

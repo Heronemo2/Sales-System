@@ -18,7 +18,7 @@ try {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'quotation') {
     $id = (int)($_POST['id'] ?? 0);
     $decision = $_POST['decision'] ?? '';
-    if (!in_array($decision, ['Approved', 'Rejected', 'RequestStock'], true)) {
+    if (!in_array($decision, ['Approved', 'Rejected'], true)) {
         $error = 'Invalid approval decision.';
     } else {
         try {
@@ -33,54 +33,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'quotati
                 $localStock = getTeamSalesInventory($pdo, (string)$quotation['product_code']);
                 $available = (float)($localStock['stock_quantity'] ?? 0);
                 $required = (float)$quotation['quantity'];
-                if (!$localStock || $required <= 0 || $available < $required || (($localStock['status'] ?? '') !== 'Active')) {
-                    throw new RuntimeException('This quotation cannot be approved yet because Team Sales Inventory has insufficient stock.');
-                }
-                $upd = $pdo->prepare("UPDATE sales_quotations SET admin_status = 'Approved', inventory_status = 'Approved', inventory_quantity = ?, inventory_checked_at = NOW() WHERE sq_id = ? AND admin_status = 'Pending'");
-                $upd->execute([(int)$available, $id]);
+                $enoughStock = $localStock
+                    && $required > 0
+                    && $available >= $required
+                    && (($localStock['status'] ?? '') === 'Active');
+                $upd = $pdo->prepare("UPDATE sales_quotations SET admin_status = 'Approved', inventory_status = ?, inventory_quantity = ?, inventory_checked_at = NOW() WHERE sq_id = ? AND admin_status = 'Pending'");
+                $upd->execute([$enoughStock ? 'Approved' : 'Pending', (int)$available, $id]);
                 $notice = $upd->rowCount() ? 'Quotation approved.' : 'Quotation is no longer pending.';
-            } elseif ($decision === 'RequestStock') {
-                $localStock = getTeamSalesInventory($pdo, (string)$quotation['product_code']);
-                $available = (float)($localStock['stock_quantity'] ?? 0);
-                $required = (float)$quotation['quantity'];
-                $missing = max(0, $required - $available);
-                if ($required <= 0 || $missing <= 0) {
-                    throw new RuntimeException('A stock request is only needed when the quotation quantity exceeds available active stock.');
-                }
-
-                $existingRequestStmt = $pdo->prepare("
-                    SELECT request_status
-                    FROM inventory_stockout_approvals
-                    WHERE source_reference = ?
-                    ORDER BY id DESC
-                    LIMIT 1
-                ");
-                $existingRequestStmt->execute([(string)$quotation['quotation_no']]);
-                $existingRequestStatus = $existingRequestStmt->fetchColumn();
-                if ($existingRequestStatus === 'Requested') {
-                    throw new RuntimeException('A stock request for this quotation is already waiting for the Inventory System.');
-                }
-                if ($existingRequestStatus === 'Stocked Out') {
-                    throw new RuntimeException('Inventory has stocked out the requested items. Approve the stock-out in Team Sales before requesting more.');
-                }
-
-                $request = createTeamSalesStockoutRequest(
-                    $pdo,
-                    (string)$quotation['product_code'],
-                    $required,
-                    (string)$quotation['quotation_no']
-                );
-                $pdo->prepare("
-                    UPDATE sales_quotations
-                    SET inventory_status = 'Pending',
-                        inventory_quantity = ?,
-                        inventory_checked_at = NOW()
-                    WHERE sq_id = ? AND admin_status = 'Pending'
-                ")->execute([(int)$available, $id]);
-
-                $notice = ($request['message'] ?? 'Stock request sent to Inventory System.')
-                    . (!empty($request['request_number']) ? ' Request No.: ' . $request['request_number'] : '')
-                    . ' The quotation remains pending until stock is received.';
             } else {
                 $upd = $pdo->prepare("UPDATE sales_quotations SET admin_status = 'Rejected', status = 'Rejected' WHERE sq_id = ? AND admin_status = 'Pending'");
                 $upd->execute([$id]);
@@ -104,13 +63,6 @@ $rows->bindValue(1, $perPage, PDO::PARAM_INT);
 $rows->bindValue(2, $offset, PDO::PARAM_INT);
 $rows->execute();
 $quotations = $rows->fetchAll(PDO::FETCH_ASSOC);
-$requestStmt = $pdo->prepare("
-    SELECT inventory_request_number, request_status
-    FROM inventory_stockout_approvals
-    WHERE source_reference = ?
-    ORDER BY id DESC
-    LIMIT 1
-");
 foreach ($quotations as &$quotation) {
     $stock = getTeamSalesInventory($pdo, (string)$quotation['product_code']);
     $quotation['available_stock'] = (float)($stock['stock_quantity'] ?? 0);
@@ -118,8 +70,6 @@ foreach ($quotations as &$quotation) {
         && ($stock['status'] ?? '') === 'Active'
         && (float)$quotation['quantity'] > 0
         && $quotation['available_stock'] >= (float)$quotation['quantity'];
-    $requestStmt->execute([(string)$quotation['quotation_no']]);
-    $quotation['inventory_request'] = $requestStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 unset($quotation);
 
@@ -168,12 +118,6 @@ include __DIR__ . '/includes/header.php';
                             <?php if (!$row['has_enough_stock']): ?>
                                 <span class="badge warning">Insufficient</span>
                             <?php endif; ?>
-                            <?php if (!empty($row['inventory_request'])): ?>
-                                <br><small>
-                                    <?= htmlspecialchars($row['inventory_request']['inventory_request_number'] ?? '') ?>
-                                    · <?= htmlspecialchars($row['inventory_request']['request_status'] ?? '') ?>
-                                </small>
-                            <?php endif; ?>
                         </td>
                         <td><?= peso((float)$row['total_amount']) ?></td>
                         <td><span class="badge warning"><?= htmlspecialchars($row['admin_status']) ?></span></td>
@@ -181,19 +125,7 @@ include __DIR__ . '/includes/header.php';
                             <form method="POST" class="inline-actions approval-form" style="display:inline;">
                                 <input type="hidden" name="type" value="quotation">
                                 <input type="hidden" name="id" value="<?= (int)$row['sq_id'] ?>">
-                                <?php if ($row['has_enough_stock']): ?>
-                                    <button type="submit" class="primary-btn" name="decision" value="Approved">Approve</button>
-                                <?php else: ?>
-                                    <button type="submit" class="primary-btn" name="decision" value="Approved" disabled>Approve</button>
-                                    <?php $requestStatus = $row['inventory_request']['request_status'] ?? ''; ?>
-                                    <?php if ($requestStatus === 'Requested'): ?>
-                                        <button type="button" class="secondary-btn" disabled>Waiting for Inventory</button>
-                                    <?php elseif ($requestStatus === 'Stocked Out'): ?>
-                                        <a class="secondary-btn" href="inventory_stockout_approval.php">Approve Stockout First</a>
-                                    <?php else: ?>
-                                        <button type="submit" class="secondary-btn" name="decision" value="RequestStock">Request Stock</button>
-                                    <?php endif; ?>
-                                <?php endif; ?>
+                                <button type="submit" class="primary-btn" name="decision" value="Approved">Approve</button>
                                 <button type="submit" class="secondary-btn" name="decision" value="Rejected">Reject</button>
                             </form>
                         </td>
