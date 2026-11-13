@@ -47,13 +47,16 @@ Sales API usage:
                      this GET endpoint.
 
 Inventory remains responsible for approving requests and creating stock-outs.
-When the API reports an approved request, Sales imports its approved quantity
-into Sales inventory once. Sales does not write to Inventory's database or
-change Inventory stock directly. Request quantities must be positive whole
-numbers. Purchase Orders convert to Sales Orders after validating that the
-product is active; Sales stock sufficiency is handled during Sales Order
-approval.
+After Inventory marks a Sales delivery as Out for Delivery, Sales Admin reviews
+it in Inventory Delivery Approval. Sales imports the approved quantity into
+Sales inventory only after Sales confirms receipt through the Inventory API,
+which also creates the Inventory Delivery Receipt. Sales does not write to
+Inventory's database or change Inventory stock directly. Request quantities
+must be positive whole numbers. Purchase Orders convert to Sales Orders after
+validating that the product is active; Sales stock sufficiency is handled
+during Sales Order approval.
 
 For an existing Sales database that was not created from the updated schema,
 apply database/migrations/20261110_add_user_notifications.sql to enable Sales
-Admin approval notifications.
+Admin approval notifications. Apply database/migrations/20261113_add_inventory_delivery_approvals.sql
+to enable the Sales Admin Inventory Delivery Approval queue.

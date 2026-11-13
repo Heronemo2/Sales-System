@@ -231,6 +231,54 @@ function checkInventoryProduct(string $productCode): array
     }
 }
 
+/** Send an approved customer return to Inventory's Rejected Items report. */
+function sendApprovedSalesReturnToInventory(PDO $pdo, int $returnId): array
+{
+    require_once __DIR__ . '/../config/inventory_api.php';
+
+    $stmt = $pdo->prepare("SELECT r.ret_id,r.return_no,r.return_date,r.reason,r.return_quantity,r.admin_status,
+            o.order_no,o.product_code,c.customer_name,
+            COALESCE(
+                (SELECT p.po_no FROM purchase_orders p WHERE p.converted_order_no=o.order_no ORDER BY p.po_id DESC LIMIT 1),
+                (SELECT p.po_no FROM purchase_orders p WHERE p.quotation_id=o.quotation_id ORDER BY p.po_id DESC LIMIT 1)
+            ) AS po_no
+        FROM sales_returns r
+        JOIN sales_orders o ON o.so_id=r.order_id
+        JOIN customers c ON c.cus_id=o.customer_id
+        WHERE r.ret_id=? LIMIT 1");
+    $stmt->execute([$returnId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row || $row['admin_status'] !== 'Approved') {
+        return ['ok' => false, 'message' => 'Only an approved Sales return can be sent to Inventory.'];
+    }
+
+    $pdo->prepare("UPDATE sales_returns SET inventory_sync_status='Pending',inventory_sync_error=NULL WHERE ret_id=?")
+        ->execute([$returnId]);
+
+    try {
+        $response = inventoryApiRequest('POST', 'rejected-items.php', [
+            'return_number' => (string)$row['return_no'],
+            'order_number' => (string)$row['order_no'],
+            'po_number' => (string)($row['po_no'] ?? ''),
+            'item_code' => (string)$row['product_code'],
+            'quantity' => (int)$row['return_quantity'],
+            'reason' => (string)($row['reason'] ?? 'Customer return'),
+            'customer_name' => (string)$row['customer_name'],
+            'return_date' => (string)$row['return_date'],
+        ]);
+        $pdo->prepare("UPDATE sales_returns SET inventory_sync_status='Sent',inventory_sync_error=NULL,inventory_synced_at=NOW() WHERE ret_id=?")
+            ->execute([$returnId]);
+        return ['ok' => true, 'message' => (string)($response['message'] ?? 'Return sent to Inventory Rejected Items.')];
+    } catch (Throwable $error) {
+        $message = function_exists('mb_substr')
+            ? mb_substr($error->getMessage(), 0, 2000, 'UTF-8')
+            : substr($error->getMessage(), 0, 2000);
+        $pdo->prepare("UPDATE sales_returns SET inventory_sync_status='Failed',inventory_sync_error=? WHERE ret_id=?")
+            ->execute([$message, $returnId]);
+        return ['ok' => false, 'message' => $message];
+    }
+}
+
 function getInventoryFinishedGoods(): array
 {
     require_once __DIR__ . '/../config/inventory_api.php';
@@ -439,7 +487,7 @@ function createPurchaseOrderFromQuotation(PDO $pdo, int $quotationId): ?string {
  * Team Sales never changes Inventory stock. Inventory's own Admin
  * approves the request and the Inventory System creates the stock_out.
  */
-function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float $quantity, string $reference = '', ?string $size = null): array
+function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float $quantity, string $reference = '', ?string $size = null, string $purchaseOrderNumber = ''): array
 {
     require_once __DIR__ . '/../config/inventory_api.php';
     $productCode = trim($productCode);
@@ -468,6 +516,12 @@ function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float
         throw new RuntimeException('No active Inventory warehouse was found.');
     }
 
+    $isPurchaseOrderRequest = trim($purchaseOrderNumber) !== '';
+    $requestRemarks = $isPurchaseOrderRequest
+        ? 'Stock request from Team Sales for Purchase Order No.: ' . trim($purchaseOrderNumber) . '.'
+        : 'Direct stock request from Team Sales; not linked to a Purchase Order.'
+            . ($reference !== '' ? ' Sales note: ' . trim($reference) : '');
+
     $response = inventoryApiRequest('POST', 'requests.php', [
         'destination' => 'Sales',
         'warehouse_id' => $warehouseId,
@@ -478,8 +532,10 @@ function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float
         'requester_name' => 'Team Sales',
         'recipient_name' => 'Team Sales',
         'recipient_email' => 'team.sales@local',
-        'remarks' => 'Stock-out requested by Team Sales because Team Sales inventory is insufficient.'
-            . ($reference !== '' ? ' Reference: ' . $reference : ''),
+        'po_number' => $isPurchaseOrderRequest
+            ? trim($purchaseOrderNumber)
+            : 'N/A - Direct Sales stock request',
+        'remarks' => $requestRemarks,
         'expected_delivery_date' => date('Y-m-d', strtotime('+3 days'))
     ]);
     $request = $response['data'] ?? [];
@@ -580,8 +636,82 @@ function notifySalesAdminsPendingApproval(
 }
 
 /**
- * Import Inventory System stock-outs for destination=Sales into the
- * Team Sales approval queue. No Team Sales stock is changed here.
+ * Queue Inventory deliveries that are fully shipped and awaiting Team Sales
+ * receipt confirmation. Sales approval is completed through Inventory's
+ * accept-delivery API, which creates the Inventory Delivery Receipt.
+ */
+function syncInventoryDeliveryApprovals(PDO $salesDb): int
+{
+    require_once __DIR__ . '/../config/inventory_api.php';
+
+    $response = inventoryApiRequest('GET', 'deliveries.php');
+    $deliveries = $response['data'] ?? null;
+    if (!is_array($deliveries)) {
+        throw new RuntimeException('Inventory API returned an invalid delivery list.');
+    }
+
+    $find = $salesDb->prepare("SELECT approval_status FROM inventory_delivery_approvals WHERE inventory_request_number = ? LIMIT 1");
+    $insert = $salesDb->prepare("INSERT INTO inventory_delivery_approvals
+        (inventory_request_number, inventory_delivery_id, inventory_request_status,
+         inventory_delivery_status, items_json, approval_status)
+        VALUES (?, ?, ?, ?, ?, 'Pending')");
+    $update = $salesDb->prepare("UPDATE inventory_delivery_approvals
+        SET inventory_delivery_id = ?, inventory_request_status = ?,
+            inventory_delivery_status = ?, items_json = ?
+        WHERE inventory_request_number = ? AND approval_status = 'Pending'");
+
+    $newCount = 0;
+    foreach ($deliveries as $delivery) {
+        $requestNumber = trim((string)($delivery['request_number'] ?? ''));
+        if (
+            $requestNumber === ''
+            || (string)($delivery['destination'] ?? '') !== 'Sales'
+            || !in_array((string)($delivery['request_status'] ?? ''), ['Approved', 'Partially Approved'], true)
+            || (string)($delivery['delivery_status'] ?? '') !== 'Out for Delivery'
+        ) {
+            continue;
+        }
+
+        $items = $delivery['items'] ?? null;
+        if (!is_array($items) || !$items) {
+            continue;
+        }
+        $itemsJson = json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $find->execute([$requestNumber]);
+        $existingStatus = $find->fetchColumn();
+        if ($existingStatus === false) {
+            $insert->execute([
+                $requestNumber,
+                (int)($delivery['delivery_id'] ?? 0) ?: null,
+                (string)$delivery['request_status'],
+                (string)$delivery['delivery_status'],
+                $itemsJson,
+            ]);
+            $newCount += $insert->rowCount() > 0 ? 1 : 0;
+            notifySalesAdminsPendingApproval(
+                $salesDb,
+                'inventory-delivery-pending:' . $requestNumber,
+                'Inventory delivery awaiting Sales confirmation',
+                'Inventory reports ' . $requestNumber . ' as Out for Delivery. Review and approve receipt in Sales.',
+                'inventory_delivery_approval.php'
+            );
+        } elseif ($existingStatus === 'Pending') {
+            $update->execute([
+                (int)($delivery['delivery_id'] ?? 0) ?: null,
+                (string)$delivery['request_status'],
+                (string)$delivery['delivery_status'],
+                $itemsJson,
+                $requestNumber,
+            ]);
+        }
+    }
+
+    return $newCount;
+}
+
+/**
+ * Synchronize Inventory requests and stock-outs for Team Sales. Approved
+ * request quantities are credited only after Sales confirms receipt.
  */
 function syncInventoryStockouts(PDO $salesDb): int
 {
@@ -613,6 +743,7 @@ function syncInventoryStockouts(PDO $salesDb): int
                     'request_number' => $requestNumber,
                     'request_date' => $request['request_date'] ?? null,
                     'status' => $request['status'] ?? '',
+                    'delivery_status' => $request['delivery_status'] ?? '',
                     'approved_at' => $request['approved_at'] ?? null,
                     'request_remarks' => $request['remarks'] ?? '',
                     'item_name' => $item['item_name'] ?? '',
@@ -626,7 +757,11 @@ function syncInventoryStockouts(PDO $salesDb): int
 
             // Any stock-out destined for Sales must be imported, including
             // requests created directly in Inventory with its own request number.
-            if (!empty($item['stock_out_id']) && ($item['stock_out_destination'] ?? '') === 'Sales') {
+            if (
+                !empty($item['stock_out_id'])
+                && ($item['stock_out_destination'] ?? '') === 'Sales'
+                && (string)($request['delivery_status'] ?? '') === 'Delivered'
+            ) {
                 $stockOutRows[] = [
                     'id' => $item['stock_out_id'],
                     'stock_out_number' => $item['stock_out_number'] ?? '',
@@ -721,8 +856,9 @@ function syncInventoryStockouts(PDO $salesDb): int
             $approvedQuantity = (float)($requestRow['approved_quantity'] ?? 0);
             $isApproved = in_array($inventoryStatus, ['Approved', 'Partially Approved'], true)
                 && $approvedQuantity > 0;
+            $deliveryComplete = (string)($requestRow['delivery_status'] ?? '') === 'Delivered';
             $salesStatus = $isApproved
-                ? 'Approved'
+                ? ($deliveryComplete ? 'Approved' : 'Inventory Approved')
                 : $requestStatuses[$inventoryStatus];
             if (
                 in_array($inventoryStatus, ['Approved', 'Partially Approved'], true)
@@ -731,7 +867,7 @@ function syncInventoryStockouts(PDO $salesDb): int
                 $salesStatus = 'Rejected';
             }
             $quantityToPersist = $isApproved ? $approvedQuantity : $requestedQuantity;
-            $shouldAddStock = $isApproved;
+            $shouldAddStock = $isApproved && $deliveryComplete;
 
             if ($localRequest) {
                 $localStatus = (string)$localRequest['request_status'];
@@ -809,7 +945,7 @@ function syncInventoryStockouts(PDO $salesDb): int
                     $requestNumber,
                     trim((string)($requestRow['request_remarks'] ?? '')) ?: 'Synchronized from Inventory System.',
                 ]);
-                $shouldAddStock = $isApproved;
+                $shouldAddStock = $isApproved && $deliveryComplete;
                 if ($isApproved) {
                     notifySalesAdminsInventoryApproved(
                         $salesDb,

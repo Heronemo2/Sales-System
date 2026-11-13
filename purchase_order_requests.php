@@ -60,6 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reque
             $pdo,
             (string)$po['product_code'],
             $required,
+            (string)$po['po_no'],
+            null,
             (string)$po['po_no']
         );
 
@@ -111,7 +113,8 @@ include __DIR__ . '/includes/header.php';
 <?php if ($error): ?><div class="alert error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
 <div class="page-toolbar">
-    <p class="muted" style="color:white;">Customer-approved quotations appear here as Purchase Orders. When Sales stock is short, request the full PO quantity from Inventory; requests are matched to the PO number.</p>
+    <p class="muted" style="color:white;">Customer-approved quotations appear here as Purchase Orders. When Sales stock is short, request the full PO quantity from Inventory; requests are matched to the PO number. After Inventory dispatches the stock, approve its receipt before it is added to Sales inventory.</p>
+    <a class="primary-btn" href="inventory_delivery_approval.php">Review Inventory Deliveries</a>
 </div>
 
 <div class="panel" style="margin-top:18px;">

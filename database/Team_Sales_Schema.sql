@@ -355,6 +355,28 @@ CREATE TABLE `inventory_stockout_approvals` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
+-- Table structure for table `inventory_delivery_approvals`
+--
+
+CREATE TABLE `inventory_delivery_approvals` (
+  `approval_id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `inventory_request_number` varchar(50) NOT NULL,
+  `inventory_delivery_id` int(10) DEFAULT NULL,
+  `inventory_request_status` varchar(30) NOT NULL,
+  `inventory_delivery_status` varchar(40) NOT NULL,
+  `items_json` longtext NOT NULL,
+  `approval_status` enum('Pending','Approved') NOT NULL DEFAULT 'Pending',
+  `inventory_receipt_number` varchar(50) DEFAULT NULL,
+  `approved_by` int(10) UNSIGNED DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`approval_id`),
+  UNIQUE KEY `uq_inventory_delivery_request` (`inventory_request_number`),
+  KEY `idx_inventory_delivery_approval_status` (`approval_status`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
 -- Dumping data for table `inventory_stockout_approvals`
 --
 
@@ -560,9 +582,13 @@ CREATE TABLE `sales_returns` (
   `order_id` int(10) UNSIGNED NOT NULL,
   `return_date` date NOT NULL,
   `reason` varchar(255) DEFAULT NULL,
+  `return_quantity` int(10) UNSIGNED NOT NULL DEFAULT 1,
   `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `status` enum('Pending','Approved','Rejected','Completed') NOT NULL DEFAULT 'Pending',
   `admin_status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
+  `inventory_sync_status` enum('Not Sent','Pending','Sent','Failed') NOT NULL DEFAULT 'Not Sent',
+  `inventory_sync_error` text DEFAULT NULL,
+  `inventory_synced_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

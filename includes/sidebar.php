@@ -5,7 +5,7 @@ $userRole = $user['role'] ?? '';
 $corePages = ['quotations.php', 'purchase_orders.php', 'orders.php', 'delivery.php', 'returns.php'];
 $billingPages = ['invoices.php', 'customer_account.php'];
 $salesReport = ['reports.php'];
-$inventoryPages = ['inventory.php', 'inventory_stockout_approval.php', 'purchase_order_requests.php'];
+$inventoryPages = ['inventory.php', 'inventory_stockout_approval.php', 'purchase_order_requests.php', 'inventory_delivery_approval.php'];
 $activeSection = '';
 if (in_array($current, $billingPages, true)) $activeSection = 'billing';
 elseif (in_array($current, $corePages, true)) $activeSection = 'core';
@@ -46,6 +46,7 @@ $isCustomer = $userRole === 'Customer';
                 <a class="section-nav <?= $current === 'sales_order_approval.php' ? 'active' : '' ?>" href="sales_order_approval.php"><span class="nav-icon">O</span><span>Sales Order Approval</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'sales_return_approval.php' ? 'active' : '' ?>" href="sales_return_approval.php"><span class="nav-icon">R</span><span>Sales Return Approval</span><span class="section-arrow">&rsaquo;</span></a>
                 <a class="section-nav <?= $current === 'inventory_stockout_approval.php' ? 'active' : '' ?>" href="inventory_stockout_approval.php"><span class="nav-icon">I</span><span>Request Stock from Inventory</span><span class="section-arrow">&rsaquo;</span></a>
+                <a class="section-nav <?= $current === 'inventory_delivery_approval.php' ? 'active' : '' ?>" href="inventory_delivery_approval.php"><span class="nav-icon">D</span><span>Inventory Delivery Approval</span><span class="section-arrow">&rsaquo;</span></a>
             <?php endif; ?>
         </nav>
         <footer>

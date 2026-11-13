@@ -20,22 +20,35 @@ try {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['type'] ?? '') === 'specific_stock_request') {
-    $productCode = trim((string)($_POST['product_code'] ?? ''));
-    $selectedSize = (string)($_POST['size'] ?? '');
-    $size = $selectedSize === '__no_size__' ? '' : $selectedSize;
+    $productName = trim((string)($_POST['product_name'] ?? ''));
+    $selectedItemId = (int)($_POST['item_id'] ?? 0);
     $quantity = filter_var($_POST['quantity'] ?? null, FILTER_VALIDATE_FLOAT);
     $remarks = trim((string)($_POST['remarks'] ?? ''));
+    $selectedItem = null;
+    foreach ($stockRequestProducts as $candidate) {
+        if ((int)($candidate['item_id'] ?? 0) === $selectedItemId) {
+            $selectedItem = $candidate;
+            break;
+        }
+    }
 
-    if ($productCode === '' || $selectedSize === '' || $quantity === false || $quantity <= 0 || floor((float)$quantity) !== (float)$quantity) {
+    if (
+        $productName === ''
+        || !$selectedItem
+        || (string)($selectedItem['item_name'] ?? '') !== $productName
+        || $quantity === false
+        || $quantity <= 0
+        || floor((float)$quantity) !== (float)$quantity
+    ) {
         $error = 'Select a finished good and size, then enter a positive whole-number quantity.';
     } else {
         try {
             $result = createTeamSalesStockoutRequest(
                 $pdo,
-                $productCode,
+                (string)$selectedItem['item_code'],
                 (float)$quantity,
                 $remarks !== '' ? $remarks : 'Specific finished-goods stock request from Sales Admin',
-                $size
+                (string)($selectedItem['size'] ?? '')
             );
             logActivity(
                 $pdo,
@@ -169,6 +182,12 @@ include __DIR__ . '/includes/header.php';
     <div class="alert success"><?= htmlspecialchars($notice) ?></div>
 <?php endif; ?>
 
+<div class="note-card">
+    <b>Next step: approve the Inventory delivery receipt.</b>
+    <span>After Inventory dispatches this request, review it in Sales Delivery Approval. Stock is added to Sales inventory only after you approve receipt.</span>
+    <a class="primary-btn" href="inventory_delivery_approval.php">Review Inventory Deliveries</a>
+</div>
+
 <section class="stats-grid" style="margin-top:18px;">
     <div class="stat-card">
         <div class="stat-icon red">!</div>
@@ -191,7 +210,7 @@ include __DIR__ . '/includes/header.php';
                 <p class="eyebrow">INVENTORY REQUEST</p>
                 <h2 style="margin:0;">Request Finished Goods from Inventory</h2>
                 <p style="color:var(--muted);margin:5px 0 0;">
-                    Select an active finished good and size, enter the quantity, and send the request to Inventory for approval.
+                    Select a product name, choose one of its available sizes and product codes, then enter the quantity.
                 </p>
             </div>
         </div>
@@ -199,26 +218,26 @@ include __DIR__ . '/includes/header.php';
             <form method="POST" class="stock-request-inline-form">
                 <input type="hidden" name="type" value="specific_stock_request">
                 <label>
-                    <span>Finished Good</span>
-                    <select name="product_code" id="stockRequestProductCode" required>
-                        <option value="">Select a finished good</option>
+                    <span>Product Name</span>
+                    <select name="product_name" id="stockRequestProductName" required>
+                        <option value="">Select a product</option>
                         <?php
                         $seenProducts = [];
                         foreach ($stockRequestProducts as $product):
-                            $productCode = (string)$product['item_code'];
-                            if (isset($seenProducts[$productCode])) continue;
-                            $seenProducts[$productCode] = true;
+                            $productName = (string)$product['item_name'];
+                            if (isset($seenProducts[$productName])) continue;
+                            $seenProducts[$productName] = true;
                         ?>
-                            <option value="<?= htmlspecialchars($productCode, ENT_QUOTES, 'UTF-8') ?>">
-                                <?= htmlspecialchars($productCode . ' — ' . $product['item_name'] . (($product['brand'] ?? '') !== '' ? ' · ' . $product['brand'] : ''), ENT_QUOTES, 'UTF-8') ?>
+                            <option value="<?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>">
+                                <?= htmlspecialchars($productName, ENT_QUOTES, 'UTF-8') ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </label>
                 <label>
-                    <span>Size</span>
-                    <select name="size" id="stockRequestProductSize" required disabled>
-                        <option value="">Select a finished good first</option>
+                    <span>Size / Product Code</span>
+                    <select name="item_id" id="stockRequestProductVariant" required disabled>
+                        <option value="">Select a product first</option>
                     </select>
                 </label>
                 <label>
@@ -288,7 +307,7 @@ include __DIR__ . '/includes/header.php';
                     };
                     ?>
                     <tr>
-                        <td><strong><?= htmlspecialchars($row['stock_out_number'] ?? '—') ?></strong></td>
+                        <td><strong><?= htmlspecialchars(trim((string)($row['stock_out_number'] ?? '')) !== '' ? $row['stock_out_number'] : 'Not returned by Inventory') ?></strong></td>
                         <td><?= htmlspecialchars($row['inventory_request_number'] ?? '—') ?></td>
                         <td>
                             <strong><?= htmlspecialchars($row['product_code']) ?></strong><br>
@@ -299,9 +318,9 @@ include __DIR__ . '/includes/header.php';
                         <td><span class="badge <?= badgeClass($row['request_status']) ?>"><?= htmlspecialchars($row['request_status']) ?></span></td>
                         <td>
                             <?php if (in_array($row['request_status'], ['Stocked Out', 'Approved'], true)): ?>
-                                <span class="badge warning">Inventory approved • Added to Team Sales Inventory</span>
+                                <span class="badge success">Inventory approved • Added to Team Sales Inventory</span>
                             <?php elseif ($row['request_status'] === 'Inventory Approved'): ?>
-                                <span class="badge success">Approved by Inventory • Waiting for stock-out</span>
+                                <span class="badge warning">Approved by Inventory • Waiting for Sales receipt approval</span>
                             <?php elseif ($row['request_status'] === 'Requested'): ?>
                                 <span class="muted">Waiting for Inventory</span>
                             <?php elseif ($row['request_status'] === 'Rejected'): ?>
@@ -334,25 +353,27 @@ include __DIR__ . '/includes/header.php';
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const productSelect = document.getElementById('stockRequestProductCode');
-    const sizeSelect = document.getElementById('stockRequestProductSize');
-    if (!productSelect || !sizeSelect) return;
+    const productSelect = document.getElementById('stockRequestProductName');
+    const variantSelect = document.getElementById('stockRequestProductVariant');
+    if (!productSelect || !variantSelect) return;
 
     const variants = <?= json_encode(array_values($stockRequestProducts), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
-    function updateSizes() {
-        sizeSelect.innerHTML = '<option value="">Select a size</option>';
+    function updateVariants() {
+        variantSelect.innerHTML = '<option value="">Select a size and product code</option>';
         const matchingVariants = variants.filter(function (product) {
-            return String(product.item_code) === productSelect.value;
+            return String(product.item_name) === productSelect.value;
         });
         matchingVariants.forEach(function (product) {
+            const size = product.size ? String(product.size) : '';
             const option = document.createElement('option');
-            option.value = product.size ? product.size : '__no_size__';
-            option.textContent = (product.size || 'Standard / no size') + (product.unit ? ' · ' + product.unit : '');
-            sizeSelect.appendChild(option);
+            option.value = String(product.item_id);
+            option.textContent = (size || 'Standard / no size') + ' · ' + String(product.item_code)
+                + (product.unit ? ' · ' + String(product.unit) : '');
+            variantSelect.appendChild(option);
         });
-        sizeSelect.disabled = matchingVariants.length === 0;
+        variantSelect.disabled = matchingVariants.length === 0;
     }
-    productSelect.addEventListener('change', updateSizes);
+    productSelect.addEventListener('change', updateVariants);
 });
 </script>
 
