@@ -160,7 +160,7 @@ CREATE TABLE `collections` (
   `collection_date` date NOT NULL,
   `due_date` date DEFAULT NULL,
   `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
-  `method` enum('Cash','GCash','Bank Transfer') NOT NULL DEFAULT 'Cash',
+  `method` enum('Cash','GCash','Bank Transfer','Cash on Delivery','Debit','Credit','Debit/Credit Card') NOT NULL DEFAULT 'Cash',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -475,8 +475,8 @@ CREATE TABLE `sales_orders` (
   `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
   `status` enum('Pending','Processing','Invoiced','Completed','Cancelled','Returned') NOT NULL DEFAULT 'Pending',
   `admin_status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
-  `payment_method` enum('GCash','Bank Transfer','Cash on Delivery') NOT NULL DEFAULT 'Cash on Delivery',
-  `payment_status` enum('Pending','Paid','Failed') NOT NULL DEFAULT 'Pending',
+  `payment_method` enum('GCash','Bank Transfer','Cash on Delivery','Debit','Credit','Debit/Credit Card') NOT NULL DEFAULT 'Cash on Delivery',
+  `payment_status` enum('Pending','Partially Paid','Paid','Failed') NOT NULL DEFAULT 'Pending',
   `payment_reference` varchar(100) DEFAULT NULL,
   `receipt_no` varchar(30) DEFAULT NULL,
   `paid_at` datetime DEFAULT NULL,
@@ -549,8 +549,8 @@ CREATE TABLE `sales_quotations` (
   `shipping_fee` decimal(12,2) NOT NULL DEFAULT 0.00,
   `status` enum('Pending','Approved','Rejected','Expired') NOT NULL DEFAULT 'Pending',
   `admin_status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
-  `payment_method` enum('GCash','Bank Transfer','Cash on Delivery') NOT NULL DEFAULT 'Cash on Delivery',
-  `payment_status` enum('Pending','Paid','Failed') NOT NULL DEFAULT 'Pending',
+  `payment_method` enum('GCash','Bank Transfer','Cash on Delivery','Debit','Credit','Debit/Credit Card') NOT NULL DEFAULT 'Cash on Delivery',
+  `payment_status` enum('Pending','Partially Paid','Paid','Failed') NOT NULL DEFAULT 'Pending',
   `payment_reference` varchar(100) DEFAULT NULL,
   `receipt_no` varchar(30) DEFAULT NULL,
   `paid_at` datetime DEFAULT NULL,
@@ -920,6 +920,21 @@ ALTER TABLE `sales_quotations`
 --
 ALTER TABLE `sales_returns`
   ADD CONSTRAINT `sales_returns_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `sales_orders` (`so_id`);
+
+CREATE TABLE `gateway_payment_events` (
+  `event_id` CHAR(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `transaction_ref` VARCHAR(50) NOT NULL,
+  `invoice_id` INT(10) UNSIGNED NOT NULL,
+  `amount_centavos` BIGINT(20) UNSIGNED NOT NULL,
+  `payment_method` ENUM('GCASH','CARD') NOT NULL,
+  `status` ENUM('SUCCESS','FAILED') NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`event_id`),
+  UNIQUE KEY `uq_gateway_transaction_ref` (`transaction_ref`),
+  KEY `idx_gateway_payment_invoice` (`invoice_id`),
+  CONSTRAINT `fk_gateway_payment_invoice`
+    FOREIGN KEY (`invoice_id`) REFERENCES `sales_invoices` (`inv_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 COMMIT;
 

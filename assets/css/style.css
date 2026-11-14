@@ -3175,43 +3175,18 @@ tbody tr:hover {
 }
 .receipt-collection-row {
   display: grid;
-  grid-template-columns: 1.1fr 0.8fr 1fr 0.9fr;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1.2fr) repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
 }
-.receipt-payment-form {
-  border-top: 1px dashed #cfcfd3;
-  padding-top: 14px;
-  margin-top: 12px;
+.receipt-collection-row > div:last-child {
+  grid-column: 1 / -1;
 }
-.receipt-form-title {
-  font-weight: 800;
-  font-size: 13px;
-  margin-bottom: 10px;
-}
-.receipt-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-.receipt-form-grid label {
-  font-size: 12px;
-  font-weight: 700;
-}
-.receipt-form-grid input,
-.receipt-form-grid select {
-  display: block;
-  width: 100%;
-  margin-top: 5px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  box-sizing: border-box;
+.receipt-collection-row strong {
+  overflow-wrap: anywhere;
 }
 .customer-balance-box {
   display: grid;
@@ -3260,7 +3235,6 @@ tbody tr:hover {
   .receipt-status {
     align-items: flex-start;
   }
-  .receipt-form-grid,
   .customer-balance-box {
     grid-template-columns: 1fr;
   }
@@ -3268,7 +3242,12 @@ tbody tr:hover {
     grid-column: auto;
   }
   .receipt-collection-row {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .receipt-collection-row > div:first-child,
+  .receipt-collection-row > div:nth-child(4),
+  .receipt-collection-row > div:last-child {
+    grid-column: 1 / -1;
   }
 }
 /* ================================

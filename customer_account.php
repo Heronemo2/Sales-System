@@ -14,7 +14,7 @@ $section = $_GET['section'] ?? 'billing';
 $section = in_array($section, ['billing', 'payment'], true) ? $section : 'billing';
 
 /* =========================================================
-   RECORD COLLECTION FROM THE SAME BILLING RECEIPT
+   RECORD COLLECTION FROM THE BILLING RECEIPT
    ========================================================= */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'record_collection') {
     $invoiceId = (int)($_POST['invoice_id'] ?? 0);
@@ -122,7 +122,7 @@ if ($search !== '') {
    BILLING RECEIPTS
    One receipt contains:
    - Accounts Receivable
-   - Collection history / collection form
+   - Collection history
    ========================================================= */
 $sql = "
     SELECT
@@ -288,16 +288,6 @@ include __DIR__ . '/includes/header.php'; ?>
                         <?php endforeach;
                     else: ?><p class="empty-text">No collection recorded.</p><?php endif; ?>
                 </div>
-                <?php if ($amountDue > 0): ?>
-                    <form method="POST" class="receipt-payment-form" style="margin-top:20px"><input type="hidden" name="action" value="record_collection"><input type="hidden" name="invoice_id" value="<?= $invoiceId ?>">
-                        <div class="receipt-form-title">Record Collection</div>
-                        <div class="receipt-form-grid"><label>Amount (₱)<input type="number" name="amount" step="0.01" min="0.01" max="<?= number_format($amountDue, 2, '.', '') ?>" required></label><label>Collection Date<input type="date" name="collection_date" value="<?= date('Y-m-d') ?>" required></label><label>Due Date<input type="date" name="due_date" value="<?= htmlspecialchars($receipt['due_date']) ?>" required></label><label>Method<select name="method">
-                                    <option>Cash</option>
-                                    <option>GCash</option>
-                                    <option>Bank Transfer</option>
-                                </select></label></div><button class="primary-btn" type="submit">Save Collection</button>
-                    </form>
-                <?php endif; ?>
             </div>
         </div>
     <?php endforeach; ?>
