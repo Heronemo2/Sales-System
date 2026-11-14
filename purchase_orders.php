@@ -35,14 +35,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->beginTransaction();
             try {
                 $insertOrder = $pdo->prepare("INSERT INTO sales_orders
-                    (order_no, quotation_id, customer_id, order_date, product_code, quantity, total_amount, status, admin_status, payment_method, payment_status, payment_reference, paid_at, receipt_no)
-                    VALUES (?,?,?,?,?,?,?,'Pending','Pending',?,?,?,?,?)");
+                    (order_no, quotation_id, customer_id, order_date, product_code, size, quantity, total_amount, status, admin_status, payment_method, payment_status, payment_reference, paid_at, receipt_no)
+                    VALUES (?,?,?,?,?,?,?,?,'Pending','Pending',?,?,?,?,?)");
                 $insertOrder->execute([
                         $orderNo,
                         $po['quotation_id'],
                         $po['customer_id'],
                         date('Y-m-d'),
                         $po['product_code'],
+                        $po['size'] ?? null,
                         $po['quantity'],
                         $po['total_amount'],
                         $payment['payment_method'],
@@ -59,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $pdo,
                     'sales-order-pending:' . $orderId,
                     'Sales order awaiting approval',
-                    'Sales Order ' . $orderNo . ' for ' . $customerName . ' (' . $po['product_code'] . ' × ' . (int)$po['quantity'] . ') is awaiting review.',
+                    'Sales Order ' . $orderNo . ' for ' . $customerName . ' (' . $po['product_code'] . ' · Size ' . ($po['size'] ?? '') . ' × ' . (int)$po['quantity'] . ') is awaiting review.',
                     'sales_order_approval.php'
                 );
                 $pdo->prepare("UPDATE purchase_orders SET status='Converted', converted_order_no=?, converted_at=NOW() WHERE po_id=?")
@@ -135,7 +136,7 @@ unset($row);
                         <td><b><?= htmlspecialchars($r['po_no']) ?></b></td>
                         <td><?= htmlspecialchars($r['quotation_no']) ?></td>
                         <td><?= htmlspecialchars($r['customer_name']) ?></td>
-                        <td><?= htmlspecialchars($r['product_code']) ?></td>
+                        <td><?= htmlspecialchars($r['product_code']) ?><?= !empty($r['size']) ? ' · Size ' . htmlspecialchars($r['size']) : '' ?></td>
                         <td><?= (int)$r['quantity'] ?></td>
                         <td><?= peso((float)$r['total_amount']) ?></td>
                         <td><span class="badge <?= badgeClass($r['status']) ?>"><?= htmlspecialchars($r['status']) ?></span></td>

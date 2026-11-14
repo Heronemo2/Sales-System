@@ -231,13 +231,14 @@ function checkInventoryProduct(string $productCode): array
     }
 }
 
-/** Send an approved customer return to Inventory's Rejected Items report. */
+/** Send an approved customer return to Inventory's Sales Returns register. */
 function sendApprovedSalesReturnToInventory(PDO $pdo, int $returnId): array
 {
     require_once __DIR__ . '/../config/inventory_api.php';
 
     $stmt = $pdo->prepare("SELECT r.ret_id,r.return_no,r.return_date,r.reason,r.return_quantity,r.admin_status,
-            o.order_no,o.product_code,c.customer_name,
+            o.order_no,o.product_code,o.size,c.customer_name,
+            (SELECT i.invoice_no FROM sales_invoices i WHERE i.order_id=o.so_id ORDER BY i.inv_id DESC LIMIT 1) AS invoice_no,
             COALESCE(
                 (SELECT p.po_no FROM purchase_orders p WHERE p.converted_order_no=o.order_no ORDER BY p.po_id DESC LIMIT 1),
                 (SELECT p.po_no FROM purchase_orders p WHERE p.quotation_id=o.quotation_id ORDER BY p.po_id DESC LIMIT 1)
@@ -251,24 +252,29 @@ function sendApprovedSalesReturnToInventory(PDO $pdo, int $returnId): array
     if (!$row || $row['admin_status'] !== 'Approved') {
         return ['ok' => false, 'message' => 'Only an approved Sales return can be sent to Inventory.'];
     }
+    if (trim((string)($row['invoice_no'] ?? '')) === '') {
+        return ['ok' => false, 'message' => 'The Sales return does not have a linked invoice number.'];
+    }
 
     $pdo->prepare("UPDATE sales_returns SET inventory_sync_status='Pending',inventory_sync_error=NULL WHERE ret_id=?")
         ->execute([$returnId]);
 
     try {
-        $response = inventoryApiRequest('POST', 'rejected-items.php', [
+        $response = inventoryApiRequest('POST', 'sales-returns.php', [
             'return_number' => (string)$row['return_no'],
+            'sales_invoice_number' => (string)$row['invoice_no'],
+            'return_reason' => trim((string)($row['reason'] ?? '')) ?: 'Customer return',
+            'item_code' => (string)$row['product_code'],
+            'size' => (string)($row['size'] ?? ''),
+            'quantity' => (int)$row['return_quantity'],
             'order_number' => (string)$row['order_no'],
             'po_number' => (string)($row['po_no'] ?? ''),
-            'item_code' => (string)$row['product_code'],
-            'quantity' => (int)$row['return_quantity'],
-            'reason' => (string)($row['reason'] ?? 'Customer return'),
             'customer_name' => (string)$row['customer_name'],
             'return_date' => (string)$row['return_date'],
         ]);
         $pdo->prepare("UPDATE sales_returns SET inventory_sync_status='Sent',inventory_sync_error=NULL,inventory_synced_at=NOW() WHERE ret_id=?")
             ->execute([$returnId]);
-        return ['ok' => true, 'message' => (string)($response['message'] ?? 'Return sent to Inventory Rejected Items.')];
+        return ['ok' => true, 'message' => (string)($response['message'] ?? 'Return sent to Inventory Sales Returns.')];
     } catch (Throwable $error) {
         $message = function_exists('mb_substr')
             ? mb_substr($error->getMessage(), 0, 2000, 'UTF-8')
@@ -364,12 +370,17 @@ function createInventoryStockRequest(
     float $requiredQuantity,
     string $recipientName = 'Team Sales',
     string $recipientGmail = '',
-    string $remarks = ''
+    string $remarks = '',
+    ?string $size = null
 ): array {
     require_once __DIR__ . '/../config/inventory_api.php';
     try {
         if ($requiredQuantity <= 0 || floor($requiredQuantity) !== $requiredQuantity) {
             throw new InvalidArgumentException('Inventory requests must use a positive whole-number quantity.');
+        }
+        $size = trim((string)$size);
+        if ($size === '') {
+            throw new InvalidArgumentException('A size is required for Finished Goods. Select the exact size from the customer request.');
         }
 
         $catalog = getInventoryApiCatalog();
@@ -379,6 +390,7 @@ function createInventoryStockRequest(
                 (string)($item['item_code'] ?? '') === trim($productCode)
                 && ($item['item_type'] ?? '') === 'Finished Good'
                 && ($item['status'] ?? '') === 'Active'
+                && trim((string)($item['size'] ?? '')) === $size
             ) {
                 $product = $item;
                 break;
@@ -397,6 +409,8 @@ function createInventoryStockRequest(
             'warehouse_id' => $warehouseId,
             'items' => [[
                 'item_id' => (int)$product['item_id'],
+                'item_name' => (string)$product['item_name'],
+                'size' => $size,
                 'quantity' => (int)$requiredQuantity
             ]],
             'requester_name' => 'Team Sales',
@@ -454,11 +468,11 @@ function createPurchaseOrderFromQuotation(PDO $pdo, int $quotationId): ?string {
     try {
         $poNo = nextDocNo($pdo, 'purchase_orders', 'PO-', 4000);
         $pdo->prepare("INSERT INTO purchase_orders
-            (po_no, quotation_id, customer_id, product_code, inventory_product_id, quantity, total_amount, order_date, status)
-            VALUES (?,?,?,?,?,?,?,CURDATE(),'Open')")
+            (po_no, quotation_id, customer_id, product_code, size, inventory_product_id, quantity, total_amount, order_date, status)
+            VALUES (?,?,?,?,?,?,?,?,CURDATE(),'Open')")
             ->execute([
                 $poNo, $quotationId, $quotation['customer_id'], $quotation['product_code'],
-                $quotation['fg_id'], $quotation['quantity'], $quotation['total_amount'],
+                $quotation['size'] ?? null, $quotation['fg_id'], $quotation['quantity'], $quotation['total_amount'],
             ]);
 
         if (!empty($quotation['source_request_id'])) {
@@ -491,8 +505,12 @@ function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float
 {
     require_once __DIR__ . '/../config/inventory_api.php';
     $productCode = trim($productCode);
+    $size = trim((string)$size);
     if ($productCode === '' || $quantity <= 0 || floor($quantity) !== $quantity) {
         throw new RuntimeException('A valid product code and positive whole-number quantity are required.');
+    }
+    if ($size === '') {
+        throw new RuntimeException('A size is required for Finished Goods. Select the exact size from the customer request.');
     }
 
     $catalog = getInventoryApiCatalog();
@@ -502,7 +520,7 @@ function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float
             (string)($candidate['item_code'] ?? '') === $productCode
             && ($candidate['item_type'] ?? '') === 'Finished Good'
             && ($candidate['status'] ?? '') === 'Active'
-            && ($size === null || (string)($candidate['size'] ?? '') === $size)
+            && trim((string)($candidate['size'] ?? '')) === $size
         ) {
             $item = $candidate;
             break;
@@ -527,6 +545,8 @@ function createTeamSalesStockoutRequest(PDO $salesDb, string $productCode, float
         'warehouse_id' => $warehouseId,
         'items' => [[
             'item_id' => (int)$item['item_id'],
+            'item_name' => (string)$item['item_name'],
+            'size' => $size,
             'quantity' => (int)$quantity
         ]],
         'requester_name' => 'Team Sales',

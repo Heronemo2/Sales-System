@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reque
             (string)$po['product_code'],
             $required,
             (string)$po['po_no'],
-            null,
+            (string)($po['size'] ?? ''),
             (string)$po['po_no']
         );
 
@@ -146,7 +146,7 @@ include __DIR__ . '/includes/header.php';
                         <td><strong><?= htmlspecialchars($order['po_no']) ?></strong><br><small><?= htmlspecialchars($order['status']) ?></small></td>
                         <td><?= htmlspecialchars($order['quotation_no']) ?></td>
                         <td><?= htmlspecialchars($order['customer_name']) ?></td>
-                        <td><?= htmlspecialchars($order['product_code']) ?></td>
+                        <td><?= htmlspecialchars($order['product_code']) ?><?= !empty($order['size']) ? ' · Size ' . htmlspecialchars($order['size']) : '' ?></td>
                         <td><?= (int)$order['quantity'] ?></td>
                         <td>
                             <?= number_format($order['available_stock'], 2) ?> available

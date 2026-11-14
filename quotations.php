@@ -57,6 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $error = 'Customer order request not found or it already has a quotation.';
 
+        } elseif (trim((string)($request['size'] ?? '')) === '') {
+
+            $error = 'The customer request does not contain a selected size. Ask the customer to resubmit the request with a size.';
+
         } else {
 
             $priceStmt = $pdo->prepare("SELECT unit_price FROM inventory WHERE BINARY product_code = BINARY ? AND status = 'Active' LIMIT 1");
@@ -127,6 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 quotation_date,
                                 valid_until,
                                 product_code,
+                                size,
                                 fg_id,
                                 quantity,
                                 inventory_quantity,
@@ -140,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             )
                             VALUES
                             (
-                                ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?,
+                                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?,
                                 ?, ?, 'Pending', 'Pending', 'Pending'
                             )
                         ");
@@ -154,6 +159,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                             // Sales quotation product code
                             $request['product_code'],
+
+                            // Exact Finished Good size selected by the customer
+                            $request['size'],
 
                             // Inventory finished_goods.id
                             $stock['fg_id'] ?? null,

@@ -59,7 +59,7 @@ $rows = $st->fetchAll();
                         <td><b><?= htmlspecialchars($r['order_no']) ?></b></td>
                         <td><?= htmlspecialchars($r['customer_name']) ?></td>
                         <td><?= niceDate($r['order_date']) ?></td>
-                        <td><?= $r['product_code'] ? htmlspecialchars($r['product_code']) . ' × ' . (int) $r['quantity'] : '—' ?></td>
+                        <td><?= $r['product_code'] ? htmlspecialchars($r['product_code']) . (!empty($r['size']) ? ' · Size ' . htmlspecialchars($r['size']) : '') . ' × ' . (int) $r['quantity'] : '—' ?></td>
                         <td><?= peso((float) $r['total_amount']) ?></td>
                         <td><span class="badge <?= badgeClass($r['status']) ?>"><?= htmlspecialchars($r['status']) ?></span></td>
                         <td><span class="badge <?= badgeClass($r['payment_status'] ?? 'Pending') ?>"><?= htmlspecialchars($r['payment_status'] ?? 'Pending') ?></span></td>
