@@ -1,13 +1,31 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) {
-    session_name('TEAM_SALES_SESSID');
+    session_name('PHPSESSID');
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => '',
+        'secure' => false,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 
 function requireLogin(): void {
-    if (empty($_SESSION['user'])) {
+    $user = $_SESSION['user'] ?? null;
+    $role = is_array($user) ? (string)($user['role'] ?? '') : '';
+    $department = is_array($user) ? strtolower(trim((string)($user['department'] ?? ''))) : '';
+    if ($department !== 'sales' || !in_array($role, ['Sales Admin', 'Sales Staff'], true)) {
         header('Location: login.php');
         exit;
+    }
+    if (empty($_SESSION['sales_session_established'])) {
+        if (!session_regenerate_id(true)) {
+            http_response_code(500);
+            exit('Could not secure the Sales session. Please sign in again.');
+        }
+        $_SESSION['sales_session_established'] = true;
     }
 }
 

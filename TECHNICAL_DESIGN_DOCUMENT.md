@@ -35,7 +35,7 @@ This design keeps the existing stack and user experience, but defines a producti
 ### Confirmed baseline and assumptions
 
 - The schema dump targets MariaDB 10.4.32 and PHP 8.2.12. Production should use a currently supported MariaDB release (recommended: MariaDB 10.11 LTS or later) and upgrade/compatibility-test before deployment.
-- The application has Sales Admin, Sales Staff, and Customer roles in the schema. The current login flow accepts Sales Admin and Sales Staff; a complete customer login/portal is not confirmed.
+- The application has Sales Admin, Sales Staff, and Customer roles in the schema. Sales Admin and Sales Staff use the ITPROFEL HR login interface; a Sales-side adapter validates the existing Sales accounts and creates a compatible shared `PHPSESSID`. Sales routes still enforce the Sales department and role. Customer sign-in remains in Customer-System.
 - Current request, quotation, purchase-order, and sales-order records hold one product and quantity each. This document preserves that single-line model.
 - The Inventory System is a separate database. A local database transaction cannot atomically commit to both databases.
 - The product description and 2–3 project-specific acceptance requirements were not provided separately. Goals above are derived from the repository's feature specification.

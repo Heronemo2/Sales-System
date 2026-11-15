@@ -40,15 +40,15 @@ This specification describes functionality visible in the current repository. It
 
 - **Purpose:** Authenticate users and limit pages by role.
 - **Actors:** Sales Admin and Sales Staff use this application; customers sign in to Customer-System after account approval.
-- **Inputs:** Username, password, and acceptance of the Terms of Service.
-- **Behavior:** Verify the password against its stored hash, create a PHP session, record the last-login time, and redirect to the sales dashboard. Sign-out ends the session.
-- **Rules:** Unauthenticated users must sign in. Restricted pages check for their required role.
+- **Inputs:** Sales Admin or Sales Staff username and password on the company HR sign-in page.
+- **Behavior:** The company HR sign-in interface is displayed for Sales sign-in. A Sales-side adapter validates existing Sales accounts against `team_sales.users`, creates the shared `PHPSESSID` identity, and routes authenticated Sales users to this application. Sign-out ends the shared session.
+- **Rules:** Sales pages accept only users whose shared session identifies the Sales department and the Sales Admin or Sales Staff role. Restricted pages continue to check their required role.
 - **Acceptance criteria:**
-  - Valid Sales Admin and Sales Staff credentials start a session.
+  - Valid, active Sales Admin and Sales Staff credentials start a shared session.
   - Invalid credentials do not authenticate the user.
   - Users without the required role cannot access protected modules.
-  - Sign-out clears the authenticated session.
-- **Implementation/data:** [login.php](./login.php), [logout.php](./logout.php), [auth.php](./includes/auth.php), `users`, `activity_logs`.
+  - Sign-out clears the shared company session.
+- **Implementation/data:** Company sign-in interface at `/ITPROFEL/root/index.php`; Sales adapter and session checks in [login.php](./login.php) and [auth_bridge.php](./auth_bridge.php); shared logout in [logout.php](./logout.php); Sales role guards in [auth.php](./includes/auth.php); account lookup in `users`.
 - Customer registrations are created as pending. The Sales Admin must approve them before the Customer-System permits sign-in.
 - **Implementation:** Customer account approval is handled in [customer_account_approvals.php](./customer_account_approvals.php); the `account_status` field is added by [20261107_add_customer_account_approval.sql](./database/migrations/20261107_add_customer_account_approval.sql).
 
