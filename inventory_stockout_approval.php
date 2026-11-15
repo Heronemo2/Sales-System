@@ -182,12 +182,6 @@ include __DIR__ . '/includes/header.php';
     <div class="alert success"><?= htmlspecialchars($notice) ?></div>
 <?php endif; ?>
 
-<div class="note-card">
-    <b>Next step: approve the Inventory delivery receipt.</b>
-    <span>After Inventory dispatches this request, review it in Sales Delivery Approval. Stock is added to Sales inventory only after you approve receipt.</span>
-    <a class="primary-btn" href="inventory_delivery_approval.php">Review Inventory Deliveries</a>
-</div>
-
 <section class="stats-grid" style="margin-top:18px;">
     <div class="stat-card">
         <div class="stat-icon red">!</div>

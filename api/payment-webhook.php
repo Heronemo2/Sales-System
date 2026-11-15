@@ -168,17 +168,26 @@ try {
 
     $newPaidCentavos = $paidCentavos + $amountCentavos;
     $newStatus = $newPaidCentavos >= $totalCentavos ? 'Paid' : 'Partially Paid';
-    $collectionNo = 'COL-' . substr(hash('sha256', $transactionRef), 0, 26);
+    $temporaryCollectionNo = 'TMP-' . bin2hex(random_bytes(12));
     $pdo->prepare("
         INSERT INTO collections
             (collection_no, invoice_id, collection_date, due_date, amount, method)
         VALUES (?, ?, CURDATE(), NULL, ?, ?)
     ")->execute([
-        $collectionNo,
+        $temporaryCollectionNo,
         (int)$invoice['inv_id'],
         payment_webhook_centavos_to_amount($amountCentavos),
         $methodLabel,
     ]);
+    $collectionId = (int)$pdo->lastInsertId();
+    $collectionNumber = 500 + $collectionId;
+    do {
+        $collectionNo = 'COL-' . $collectionNumber++;
+        $collectionNoStmt = $pdo->prepare('SELECT 1 FROM collections WHERE collection_no = ? LIMIT 1');
+        $collectionNoStmt->execute([$collectionNo]);
+    } while ($collectionNoStmt->fetchColumn());
+    $pdo->prepare('UPDATE collections SET collection_no = ? WHERE col_id = ?')
+        ->execute([$collectionNo, $collectionId]);
 
     $pdo->prepare('UPDATE sales_invoices SET amount_paid = ?, status = ? WHERE inv_id = ?')
         ->execute([
