@@ -231,21 +231,45 @@ function checkInventoryProduct(string $productCode): array
     }
 }
 
+function readSalesReturnDamagePhoto(array $upload): array
+{
+    if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Upload a JPG, PNG, or WebP damage photo (maximum 5 MB).');
+    }
+
+    $path = (string)($upload['tmp_name'] ?? '');
+    if ($path === '' || !is_file($path)) {
+        throw new RuntimeException('The damage photo could not be read.');
+    }
+
+    $size = filesize($path);
+    if ($size === false || $size < 16 || $size > 5 * 1024 * 1024) {
+        throw new RuntimeException('The damage photo must be between 16 bytes and 5 MB.');
+    }
+
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($path);
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+        throw new RuntimeException('Use a JPG, PNG, or WebP damage photo.');
+    }
+
+    $binary = file_get_contents($path);
+    if ($binary === false) {
+        throw new RuntimeException('The damage photo could not be read.');
+    }
+
+    return ['binary' => $binary, 'mime' => $mime];
+}
+
 /** Send an approved customer return to Inventory's Sales Returns register. */
-function sendApprovedSalesReturnToInventory(PDO $pdo, int $returnId): array
+function sendApprovedSalesReturnToInventory(PDO $pdo, int $returnId, ?array $damagePhotoUpload = null): array
 {
     require_once __DIR__ . '/../config/inventory_api.php';
 
     $stmt = $pdo->prepare("SELECT r.ret_id,r.return_no,r.return_date,r.reason,r.return_quantity,r.admin_status,
-            o.order_no,o.product_code,o.size,c.customer_name,
-            (SELECT i.invoice_no FROM sales_invoices i WHERE i.order_id=o.so_id ORDER BY i.inv_id DESC LIMIT 1) AS invoice_no,
-            COALESCE(
-                (SELECT p.po_no FROM purchase_orders p WHERE p.converted_order_no=o.order_no ORDER BY p.po_id DESC LIMIT 1),
-                (SELECT p.po_no FROM purchase_orders p WHERE p.quotation_id=o.quotation_id ORDER BY p.po_id DESC LIMIT 1)
-            ) AS po_no
+            r.damage_photo,r.damage_photo_mime,o.product_code,o.size,
+            (SELECT i.invoice_no FROM sales_invoices i WHERE i.order_id=o.so_id ORDER BY i.inv_id DESC LIMIT 1) AS invoice_no
         FROM sales_returns r
         JOIN sales_orders o ON o.so_id=r.order_id
-        JOIN customers c ON c.cus_id=o.customer_id
         WHERE r.ret_id=? LIMIT 1");
     $stmt->execute([$returnId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -260,17 +284,36 @@ function sendApprovedSalesReturnToInventory(PDO $pdo, int $returnId): array
         ->execute([$returnId]);
 
     try {
+        if ($damagePhotoUpload !== null && ($damagePhotoUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $photo = readSalesReturnDamagePhoto($damagePhotoUpload);
+            $pdo->prepare('UPDATE sales_returns SET damage_photo=?,damage_photo_mime=? WHERE ret_id=?')
+                ->execute([$photo['binary'], $photo['mime'], $returnId]);
+            $row['damage_photo'] = $photo['binary'];
+            $row['damage_photo_mime'] = $photo['mime'];
+        }
+        if (empty($row['damage_photo']) || empty($row['damage_photo_mime'])) {
+            throw new RuntimeException('Upload a damage photo before retrying this return sync.');
+        }
+
+        $inventoryProduct = checkInventoryProduct((string)$row['product_code']);
+        if (empty($inventoryProduct['ok']) || ($inventoryProduct['status'] ?? '') !== 'Active') {
+            throw new RuntimeException((string)($inventoryProduct['error'] ?? 'The product could not be matched in Inventory.'));
+        }
+
         $response = inventoryApiRequest('POST', 'sales-returns.php', [
             'return_number' => (string)$row['return_no'],
-            'sales_invoice_number' => (string)$row['invoice_no'],
-            'return_reason' => trim((string)($row['reason'] ?? '')) ?: 'Customer return',
-            'item_code' => (string)$row['product_code'],
-            'size' => (string)($row['size'] ?? ''),
-            'quantity' => (int)$row['return_quantity'],
-            'order_number' => (string)$row['order_no'],
-            'po_number' => (string)($row['po_no'] ?? ''),
-            'customer_name' => (string)$row['customer_name'],
+            'sales_reference' => (string)$row['invoice_no'],
             'return_date' => (string)$row['return_date'],
+            'remarks' => trim((string)($row['reason'] ?? '')) ?: 'Customer return',
+            'items' => [[
+                'item_id' => (int)$inventoryProduct['item_id'],
+                'item_name' => (string)$inventoryProduct['item_name'],
+                'size' => (string)($row['size'] ?? $inventoryProduct['size'] ?? ''),
+                'quantity' => (int)$row['return_quantity'],
+                'damage_description' => trim((string)($row['reason'] ?? '')) ?: 'Customer return',
+                'damage_photo_base64' => base64_encode((string)$row['damage_photo']),
+                'damage_photo_mime' => (string)$row['damage_photo_mime'],
+            ]],
         ]);
         $pdo->prepare("UPDATE sales_returns SET inventory_sync_status='Sent',inventory_sync_error=NULL,inventory_synced_at=NOW() WHERE ret_id=?")
             ->execute([$returnId]);

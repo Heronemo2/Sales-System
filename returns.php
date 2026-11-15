@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Order, reason, return date, return quantity, and a return amount greater than 0 are required.';
     } else {
         try {
+            $damagePhoto = readSalesReturnDamagePhoto($_FILES['damage_photo'] ?? []);
             $pdo->beginTransaction();
             $orderStmt = $pdo->prepare("SELECT o.quantity,o.status FROM sales_orders o JOIN sales_invoices i ON i.order_id=o.so_id WHERE o.so_id=? FOR UPDATE");
             $orderStmt->execute([$orderId]);
@@ -30,8 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($returnQuantity > $orderQuantity) throw new RuntimeException('Return quantity exceeds the order quantity (' . $orderQuantity . ').');
 
             $returnNo = nextDocNo($pdo, 'sales_returns', 'RET-', 0, 3);
-            $stmt = $pdo->prepare("INSERT INTO sales_returns (return_no, order_id, return_date, reason, return_quantity, total_amount, status) VALUES (?,?,?,?,?,?, 'Pending')");
-            $stmt->execute([$returnNo, $orderId, $date, $reason, $returnQuantity, $total]);
+            $stmt = $pdo->prepare("INSERT INTO sales_returns (return_no, order_id, return_date, reason, return_quantity, total_amount, damage_photo, damage_photo_mime, status) VALUES (?,?,?,?,?,?,?,?, 'Pending')");
+            $stmt->execute([$returnNo, $orderId, $date, $reason, $returnQuantity, $total, $damagePhoto['binary'], $damagePhoto['mime']]);
             $returnId = (int)$pdo->lastInsertId();
             notifySalesAdminsPendingApproval(
                 $pdo,
@@ -56,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageTitle = 'Sales Returns';
 include __DIR__ . '/includes/header.php';
 
-$search=trim($_GET['search']??''); $sql='SELECT r.*, o.order_no, o.product_code, c.customer_name AS customer_name FROM sales_returns r JOIN sales_orders o ON o.so_id=r.order_id JOIN customers c ON c.cus_id=o.customer_id'; $params=[]; if($search!==''){ $sql.=' WHERE r.return_no LIKE ? OR o.order_no LIKE ? OR c.customer_name LIKE ? OR r.reason LIKE ? OR r.status LIKE ?'; $like='%'.$search.'%'; $params=[$like,$like,$like,$like,$like]; } $sql.=' ORDER BY r.ret_id DESC'; $st=$pdo->prepare($sql); $st->execute($params); $rows=$st->fetchAll();
+$search=trim($_GET['search']??''); $sql='SELECT r.ret_id,r.return_no,r.return_date,r.reason,r.return_quantity,r.total_amount,r.status,r.admin_status,r.inventory_sync_status,r.inventory_sync_error,o.order_no,o.product_code,c.customer_name AS customer_name FROM sales_returns r JOIN sales_orders o ON o.so_id=r.order_id JOIN customers c ON c.cus_id=o.customer_id'; $params=[]; if($search!==''){ $sql.=' WHERE r.return_no LIKE ? OR o.order_no LIKE ? OR c.customer_name LIKE ? OR r.reason LIKE ? OR r.status LIKE ?'; $like='%'.$search.'%'; $params=[$like,$like,$like,$like,$like]; } $sql.=' ORDER BY r.ret_id DESC'; $st=$pdo->prepare($sql); $st->execute($params); $rows=$st->fetchAll();
 $orders = $pdo->query("SELECT o.so_id,o.order_no,o.product_code,o.quantity,c.customer_name AS customer_name FROM sales_orders o JOIN sales_invoices i ON i.order_id=o.so_id JOIN customers c ON c.cus_id=o.customer_id WHERE o.quantity>0 AND o.status<>'Returned' AND NOT EXISTS (SELECT 1 FROM sales_returns r WHERE r.order_id=o.so_id AND r.admin_status IN ('Pending','Approved')) ORDER BY o.so_id DESC")->fetchAll();
 ?>
 <div class="page-toolbar"><p class="muted" style="color: white;">Record and review products returned after a sale.</p><button class="primary-btn" data-open-modal="addReturnModal">+ New Sales Return</button></div>
@@ -86,7 +87,7 @@ $orders = $pdo->query("SELECT o.so_id,o.order_no,o.product_code,o.quantity,c.cus
         <button class="modal-close" type="button" aria-label="Close" data-close-modal>×</button>
         <p class="eyebrow">CORE SALES</p>
         <h2 id="addReturnTitle">New Sales Return</h2>
-        <form method="POST" class="entry-form">
+        <form method="POST" enctype="multipart/form-data" class="entry-form">
             <label>Sales Order
                 <select name="order_id" id="returnOrderSelect" required <?= !$orders ? 'disabled' : '' ?>>
                     <option value="">Select order</option>
@@ -99,6 +100,10 @@ $orders = $pdo->query("SELECT o.so_id,o.order_no,o.product_code,o.quantity,c.cus
             </label>
             <label>Reason
                 <input type="text" name="reason" required>
+            </label>
+            <label>Damage Photo
+                <input type="file" name="damage_photo" accept="image/jpeg,image/png,image/webp" required>
+                <small>JPG, PNG, or WebP · maximum 5 MB</small>
             </label>
             <label>Return Date
                 <input type="date" name="return_date" value="<?= date('Y-m-d') ?>" required>
