@@ -40,7 +40,9 @@ function currentUser(): array {
     if (empty($user['user_id']) && !empty($user['id'])) $user['user_id'] = (int)$user['id'];
     if (!isset($user['name'])) $user['name'] = '';
     if (empty($user['name']) && !empty($user['full_name'])) $user['name'] = $user['full_name'];
+    if (empty($user['name']) && !empty($user['fullName'])) $user['name'] = $user['fullName'];
     if (empty($user['full_name']) && !empty($user['name'])) $user['full_name'] = $user['name'];
+    if (empty($user['fullName']) && !empty($user['name'])) $user['fullName'] = $user['name'];
     return $user;
 }
 
