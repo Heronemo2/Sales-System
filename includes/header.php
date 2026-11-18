@@ -20,6 +20,7 @@ $coreModules = [
 $billingModules = [
     'customer_account.php' => ['label' => 'Billing & Finance', 'icon' => '◷'],
     'invoices.php' => ['label' => 'Sales Invoice', 'icon' => '▥'],
+    'send_to_finance.php' => ['label' => 'Send to Finance', 'icon' => 'F'],
 ];
 $activeModuleSection = array_key_exists($currentPage, $billingModules)
     ? 'billing'
